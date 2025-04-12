@@ -1,1 +1,2 @@
+async-timeout==5.0.1
 dlight-client @ git+ssh://git@github.com/Irishsmurf/dlight-client.git@a578eea37b8a44f96441ee49571d40053b5e95a9

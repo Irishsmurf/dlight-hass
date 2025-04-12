@@ -52,7 +52,6 @@ async def async_setup_entry(
 ) -> None:
     """Set up dLight light based on a config entry."""
     # Get config data stored during config flow (likely in entry.data)
-    # Assuming domain is stored in entry.domain
     # config_data = hass.data[entry.domain][entry.entry_id] # This might not be needed if data is in entry.data
     target_ip = entry.data.get("ip_address")
     device_id = entry.data.get("device_id")

@@ -36,7 +36,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
 
-DOMAIN = "dlight-lamp" # Replace with your actual domain if different
+DOMAIN = "dlight-hass"
 
 _LOGGER = logging.getLogger(__name__)
 

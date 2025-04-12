@@ -1,8 +1,6 @@
-# dLight Home Assistant Integration (`dlight_hass`)
+# dLight Home Assistant Integration (`dlight`)
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration) This is a custom integration for Home Assistant to control Google dLight smart lamps locally using the `dlight-client` Python library, which is based on the reverse-engineered local network API.
-
-**❗ IMPORTANT: API CONFIDENTIALITY WARNING ❗**
 
 * **Use this integration at your own risk.**
 * This integration is provided for personal/experimental use and carries no official support or warranty from Google or the integration author.
@@ -20,23 +18,15 @@
 
 You can install this custom component using HACS (recommended) or manually.
 
-**Method 1: HACS (Recommended)**
-
-1.  Ensure you have [HACS (Home Assistant Community Store)](https://hacs.xyz/) installed.
-2.  Add this repository as a **Custom Repository** in HACS:
-    * Go to HACS -> Integrations -> Click the 3 dots in the top right -> Custom Repositories.
-    * URL: `https://github.com/Irishsmurf/dlight-hass`
-    * Category: `Integration`
-    * Click Add.
-3.  Search for "dLight Integration" (or the name in `manifest.json`) in HACS under Integrations.
-4.  Click Install and follow the prompts.
-5.  **Restart Home Assistant.**
-
-**Method 2: Manual Installation**
+**Manual Installation**
 
 1.  Download the latest release or clone the repository containing this integration.
-2.  Copy the entire `dlight_hass` directory into your Home Assistant `<config>/custom_components/` directory. Create `custom_components` if it doesn't exist.
-    * Your final structure should look like `<config>/custom_components/dlight_hass/__init__.py`, etc.
+2.  Copy the entire `dlight` directory into your Home Assistant `<config>/custom_components/` directory. Create `custom_components` if it doesn't exist.
+    * Your final structure should look like `<config>/custom_components/dlight/__init__.py`, etc.
+3.  Clone https://github.com/Irishsmurf/dlight-client and move dlight-client/dlightclient directory into `<config>/custom_components/dlight/`
+    * `cd config/custom_components/dlight/`
+    * `git clone https://github.com/Irishsmurf/dlight-client`
+    * `mv dlight-client/dlightclient .`
 3.  **Restart Home Assistant.**
 
 ## Configuration
@@ -69,5 +59,5 @@ Configuration is done via the Home Assistant UI (Config Flow):
 * **Device Unavailable:**
     * Check if the dLight is powered on and connected to your Wi-Fi.
     * Verify the IP address configured in Home Assistant is still correct (DHCP might change it - consider setting a static IP/DHCP reservation in your router).
-    * Check Home Assistant logs (Settings -> System -> Logs) for connection errors related to `dlight_hass`.
+    * Check Home Assistant logs (Settings -> System -> Logs) for connection errors related to `dlight`.
 * **Discovery Script `PermissionError`:** If running the separate `dlight-client` discovery script fails with permission errors, you likely need to run it with `sudo` or as Administrator (see previous discussions). This does *not* affect the normal operation of the HA integration once configured.

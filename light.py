@@ -19,8 +19,7 @@ from homeassistant.components.light import (
     LightEntity,
     ATTR_BRIGHTNESS,
     ATTR_COLOR_TEMP_KELVIN,
-    ColorMode # Use enum member directly
-    # REMOVED deprecated imports: SUPPORT_BRIGHTNESS, SUPPORT_COLOR_TEMP
+    ColorMode
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback

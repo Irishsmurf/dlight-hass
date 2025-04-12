@@ -75,7 +75,7 @@ async def async_setup_entry(
                     raise UpdateFailed(f"Failed to query device state: {state_data}")
                 # Return only the 'states' dict if present
                 if "states" not in state_data:
-                     raise UpdateFailed(f"Invalid state data received: {state_data}")
+                    raise UpdateFailed(f"Invalid state data received: {state_data}")
                 return state_data["states"]
         except asyncio.TimeoutError as err: # Catch asyncio timeout specifically
             raise UpdateFailed(f"Timeout communicating with dLight {device_id} ({name}): {err}") from err
@@ -84,8 +84,8 @@ async def async_setup_entry(
         except DLightError as err: # Catch other library errors
             raise UpdateFailed(f"Error communicating with dLight {device_id} ({name}): {err}") from err
         except Exception as err: # Catch unexpected errors
-             _LOGGER.exception("Unexpected error updating dLight %s", name)
-             raise UpdateFailed(f"Unexpected error updating dLight {device_id} ({name}): {err}") from err
+            _LOGGER.exception("Unexpected error updating dLight %s", name)
+            raise UpdateFailed(f"Unexpected error updating dLight {device_id} ({name}): {err}") from err
 
     coordinator = DataUpdateCoordinator(
         hass,
@@ -150,7 +150,7 @@ class DLightEntity(CoordinatorEntity, LightEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(entry.domain, self._device_id)}, # Use domain and unique ID
             name=self._base_name, # Use name from config entry title
-            manufacturer="Google (via custom integration)", # Or unknown
+            manufacturer="Google", # Or unknown
             # Model/SW/HW could be fetched from query_device_info if desired
             # Example: Fetching from initial coordinator data (might not always be available)
             # model=self.coordinator.data.get("model", "dLight") if self.coordinator.data else "dLight",
@@ -179,7 +179,7 @@ class DLightEntity(CoordinatorEntity, LightEntity):
         """Return true if light is on."""
         # Return optimistic state if available, otherwise coordinator data
         if self._attr_is_on is not None: # Check internal optimistic state first
-             return self._attr_is_on
+            return self._attr_is_on
         if self.coordinator.data:
             return self.coordinator.data.get("on")
         return None # Unknown state if coordinator hasn't fetched data
@@ -189,7 +189,7 @@ class DLightEntity(CoordinatorEntity, LightEntity):
         """Return the brightness of this light between 0..255."""
         # Return optimistic state if available, otherwise coordinator data
         if self._attr_brightness is not None:
-             return self._attr_brightness
+            return self._attr_brightness
         if self.coordinator.data:
             dlight_brightness = self.coordinator.data.get("brightness")
             if dlight_brightness is not None:
@@ -200,9 +200,9 @@ class DLightEntity(CoordinatorEntity, LightEntity):
     @property
     def color_temp_kelvin(self) -> int | None:
         """Return the CT color value in Kelvin."""
-         # Return optimistic state if available, otherwise coordinator data
+        # Return optimistic state if available, otherwise coordinator data
         if self._attr_color_temp_kelvin is not None:
-             return self._attr_color_temp_kelvin
+            return self._attr_color_temp_kelvin
         # Check coordinator data exists and 'color' key is present
         if self.coordinator.data and isinstance(self.coordinator.data.get("color"), dict):
             return self.coordinator.data["color"].get("temperature")
@@ -230,15 +230,15 @@ class DLightEntity(CoordinatorEntity, LightEntity):
             # --- Send Commands to Device ---
             # If only 'turn_on' is called (no kwargs), send explicit 'on'.
             if not kwargs:
-                 _LOGGER.debug("Turning on %s (explicit call)", self.entity_id)
-                 await self.client.set_light_state(self._ip_address, self._device_id, True)
-                 # Keep previous brightness/temp for optimistic state if just turning on
+                _LOGGER.debug("Turning on %s (explicit call)", self.entity_id)
+                await self.client.set_light_state(self._ip_address, self._device_id, True)
+                # Keep previous brightness/temp for optimistic state if just turning on
 
             # Set Color Temp (if provided) - Send before brightness? Order might matter.
             if color_temp_k is not None:
-                 _LOGGER.debug("Setting %s color temp to %d K", self.entity_id, optimistic_color_temp)
-                 await self.client.set_color_temperature(self._ip_address, self._device_id, optimistic_color_temp)
-                 # await asyncio.sleep(0.1) # Optional delay
+                _LOGGER.debug("Setting %s color temp to %d K", self.entity_id, optimistic_color_temp)
+                await self.client.set_color_temperature(self._ip_address, self._device_id, optimistic_color_temp)
+                # await asyncio.sleep(0.1) # Optional delay
 
             # Set Brightness (if provided)
             if brightness_ha is not None:
@@ -247,7 +247,7 @@ class DLightEntity(CoordinatorEntity, LightEntity):
                 _LOGGER.debug("Setting %s brightness to %d%% (%d HA)", self.entity_id, dlight_brightness, optimistic_brightness)
                 # Only send if brightness > 0, otherwise it acts like turn_off
                 if dlight_brightness > 0:
-                     await self.client.set_brightness(self._ip_address, self._device_id, dlight_brightness)
+                    await self.client.set_brightness(self._ip_address, self._device_id, dlight_brightness)
                 else:
                     # If brightness 0 is requested via turn_on service, treat as turn_off
                     _LOGGER.debug("Brightness 0 requested via turn_on, calling turn_off instead")
@@ -278,12 +278,12 @@ class DLightEntity(CoordinatorEntity, LightEntity):
             self._attr_color_temp_kelvin = None
             self.async_write_ha_state() # Write the cleared state
         except Exception as err:
-             _LOGGER.exception("Unexpected error turning on dLight %s", self.entity_id)
-             # Clear optimistic state
-             self._attr_is_on = None
-             self._attr_brightness = None
-             self._attr_color_temp_kelvin = None
-             self.async_write_ha_state()
+            _LOGGER.exception("Unexpected error turning on dLight %s", self.entity_id)
+            # Clear optimistic state
+            self._attr_is_on = None
+            self._attr_brightness = None
+            self._attr_color_temp_kelvin = None
+            self.async_write_ha_state()
 
 
     async def async_turn_off(self, **kwargs: Any) -> None:
@@ -311,12 +311,12 @@ class DLightEntity(CoordinatorEntity, LightEntity):
             self._attr_color_temp_kelvin = None
             self.async_write_ha_state()
         except Exception as err:
-             _LOGGER.exception("Unexpected error turning off dLight %s", self.entity_id)
-             # Clear optimistic state
-             self._attr_is_on = None
-             self._attr_brightness = None
-             self._attr_color_temp_kelvin = None
-             self.async_write_ha_state()
+            _LOGGER.exception("Unexpected error turning off dLight %s", self.entity_id)
+            # Clear optimistic state
+            self._attr_is_on = None
+            self._attr_brightness = None
+            self._attr_color_temp_kelvin = None
+            self.async_write_ha_state()
 
     # update method is handled by CoordinatorEntity via coordinator.async_update_data
 

@@ -1,4 +1,5 @@
 *.zip
+.venv/
 __pycache__/
 dlightclient/
 dlight-client-*

@@ -39,13 +39,6 @@ try:
 except ImportError:
     # Handle case where library isn't installed (should not happen in HA)
     _LOGGER.error("dlightclient library not found. Please install it.")
-    # You might want to prevent setup from continuing here
-    # For development, you might still have a vendored fallback, but it's not ideal
-    # from .dlightclient import AsyncDLightClient, DLightDevice, DLightError, DLightTimeoutError # Example fallback
-
-
-# Import domain constant if defined in __init__.py or const.py
-# from .const import DOMAIN
 
 # Define update interval for polling
 UPDATE_INTERVAL = datetime.timedelta(

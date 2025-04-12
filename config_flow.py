@@ -59,7 +59,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         raise CannotConnect(f"Unexpected error validating dLight: {err}") from err
 
 
-class DLightConfigFlow(config_entries.ConfigFlow, domain="dlight_hass"): # Use your domain
+class DLightConfigFlow(config_entries.ConfigFlow, domain="dlight"): # Use your domain
     """Handle a config flow for dLight."""
 
     VERSION = 1

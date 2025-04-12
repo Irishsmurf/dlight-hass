@@ -1,6 +1,6 @@
 {
-    "domain": "dlight_hass",
-    "name": "dLight Integration",
+    "domain": "dlight",
+    "name": "dLight",
     "documentation": "URL_TO_YOUR_README_IF_ANY",
     "issue_tracker": "URL_TO_YOUR_ISSUES_IF_ANY",
     "codeowners": ["@irishsmurf"],

@@ -1,8 +1,8 @@
 {
     "domain": "dlight",
     "name": "dLight",
-    "documentation": "URL_TO_YOUR_README_IF_ANY",
-    "issue_tracker": "URL_TO_YOUR_ISSUES_IF_ANY",
+    "documentation": "https://github.com/Irishsmurf/dlight-hass",
+    "issue_tracker": "https://github.com/Irishsmurf/dlight-hass/issues",
     "codeowners": ["@irishsmurf"],
     "iot_class": "local_polling",
     "version": "0.1.0",

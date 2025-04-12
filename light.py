@@ -1,44 +1,49 @@
-"""Platform for dLight lights."""
-import logging
-from typing import Any
-import math # For brightness conversion
-import datetime # For coordinator updates
-import async_timeout # For coordinator updates
-import asyncio # For potential delays and timeout errors
-
-# Import your library and exceptions
-try:
-    # Assuming library installed via requirements
-    from dlightclient.dlight import AsyncDLightClient, DLightError, DLightTimeoutError
-except ImportError:
-    # Fallback if library is vendored (copied into the integration folder)
-    from .dlightclient.dlight import AsyncDLightClient, DLightError, DLightTimeoutError
-
-
-from homeassistant.components.light import (
-    LightEntity,
-    ATTR_BRIGHTNESS,
-    ATTR_COLOR_TEMP_KELVIN,
-    ColorMode
-)
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+"""Platform for dLight lights using dlightclient library."""
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
     UpdateFailed,
 )
-
-
-# Potentially import constants
-# from .const import DOMAIN, UPDATE_INTERVAL
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.components.light import (
+    LightEntity,
+    ATTR_BRIGHTNESS,
+    ATTR_COLOR_TEMP_KELVIN,
+    ColorMode,
+    ENTITY_ID_FORMAT  # Used for default entity_id generation if needed
+)
+import logging
+from typing import Any, Dict, Optional
+import math  # For brightness conversion
+import datetime  # For coordinator updates
+import async_timeout  # For coordinator updates
+import asyncio  # For potential delays and timeout errors
 
 _LOGGER = logging.getLogger(__name__)
 
+# Import the refactored library components
+try:
+    from dlightclient import (
+        AsyncDLightClient,
+        DLightDevice,
+        DLightError,
+        DLightTimeoutError,
+        DLightConnectionError,
+        STATUS_SUCCESS
+    )
+    # Import constants if needed, e.g., for Kelvin range defaults
+    # from dlightclient import constants
+except ImportError:
+    # Handle case where library isn't installed (should not happen in HA)
+    _LOGGER.error("dlightclient library not found. Please install it.")
+
 # Define update interval for polling
-UPDATE_INTERVAL = datetime.timedelta(seconds=30) # Example: Poll every 30 seconds
+UPDATE_INTERVAL = datetime.timedelta(
+    seconds=30)  # Example: Poll every 30 seconds
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -46,100 +51,133 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up dLight light based on a config entry."""
-    # Get config data stored in __init__.py
-    config_data = hass.data[entry.domain][entry.entry_id]
-    target_ip = config_data.get("ip_address")
-    device_id = config_data.get("device_id")
+    # Get config data stored during config flow (likely in entry.data)
+    # Assuming domain is stored in entry.domain
+    # config_data = hass.data[entry.domain][entry.entry_id] # This might not be needed if data is in entry.data
+    target_ip = entry.data.get("ip_address")
+    device_id = entry.data.get("device_id")
     # Get name from config entry (set during config flow) or create default
     name = entry.title or f"dLight {device_id}"
 
     if not target_ip or not device_id:
-        _LOGGER.error("Missing IP address or Device ID in config entry: %s", entry.entry_id)
+        _LOGGER.error(
+            "Missing IP address or Device ID in config entry data: %s", entry.entry_id)
         return
-
-    # Create an instance of your async client library
+    # If each device needs its own client (unlikely here), create inside coordinator/entity
     client = AsyncDLightClient()
+    # Create the DLightDevice instance to represent this specific light
+    device = DLightDevice(ip_address=target_ip,
+                          device_id=device_id, client=client)
+    _LOGGER.info("Setting up dLight device: %s", device)
 
     # --- Coordinator for polling ---
-    async def async_update_data():
-        """Fetch data from API endpoint."""
-        _LOGGER.debug("Polling dLight state for %s", name)
-        
-        state_data = {}
-        info_data = {}
-        combined_data = {}
 
+    async def async_update_data() -> Dict[str, Any]:
+        """Fetch data from the dLight device using the DLightDevice instance."""
+        _LOGGER.debug("Polling dLight state for %s (%s)", name, device_id)
+
+        # Use the DLightDevice methods for fetching data
         try:
-            # Use the async version of the client library
-            async with async_timeout.timeout(10): # Timeout for the update operation
-                # No need for executor job with async library
+            # Fetch state and info concurrently
+            # Timeout for the entire update operation
+            async with async_timeout.timeout(10):
                 results = await asyncio.gather(
-                    client.query_device_state(target_ip, device_id),
-                    client.query_device_info(target_ip, device_id),
+                    device.get_state(),  # Use device method
+                    device.get_info(),  # Use device method
                     return_exceptions=True
                 )
                 state_result = results[0]
                 info_result = results[1]
-                
+
+                combined_data: Dict[str, Any] = {}
+
+                # Process state result
                 if isinstance(state_result, DLightError):
-                    _LOGGER.warning("Failed to query device state for %s: %s", name, state_result)
-                    if not isinstance(info_result, dict) or info_result.get("status") != "SUCCESS":
-                        raise UpdateFailed(f"Failed to query essential state for {name}: {state_result}") from state_result
+                    _LOGGER.warning(
+                        "Failed to query device state for %s: %s", name, state_result)
+                    # Allow update to proceed if info is okay, otherwise fail
+                    if not isinstance(info_result, dict):  # Check if info also failed
+                        raise UpdateFailed(
+                            f"Failed to query essential state for {name}: {state_result}") from state_result
+                    # state_data remains empty
                 elif isinstance(state_result, Exception):
-                    _LOGGER.error("Unexpected error querying state for %s: %s", name, state_result)
-                    if not isinstance(info_result, dict) or info_result.get("status") != "SUCCESS":
-                        raise UpdateFailed(f'Unexpected error querying state for {name}: {state_result}') from state_result
-                elif not state_result or state_result.get("status") != "SUCCESS":
-                    _LOGGER.warning("Invalid or non-SUCCESS state data received for %s: %s", name, state_result)
-                    if not isinstance(info_result, dict) or info_result.get("status") != "SUCCESS":
-                         raise UpdateFailed(f"Invalid state data received for {name}: {state_result}")
-                elif "states" in state_result:
-                    state_data = state_result["states"] # Extract the nested 'states' dict
+                    _LOGGER.error(
+                        "Unexpected error querying state for %s: %s", name, state_result, exc_info=True)
+                    if not isinstance(info_result, dict):
+                        raise UpdateFailed(
+                            f'Unexpected error querying state for {name}: {state_result}') from state_result
+                    # state_data remains empty
+                elif not isinstance(state_result, dict):
+                    # get_state should return a dict, even if empty
+                    _LOGGER.warning(
+                        "Invalid state data type received for %s: %s", name, type(state_result))
+                    if not isinstance(info_result, dict):
+                        raise UpdateFailed(
+                            f"Invalid state data received for {name}")
+                    # state_data remains empty
                 else:
-                     _LOGGER.warning("State data received but missing 'states' key for %s: %s", name, state_result)
-                     if not isinstance(info_result, dict) or info_result.get("status") != "SUCCESS":
-                          raise UpdateFailed(f"State data missing 'states' key for {name}: {state_result}")
-                
+                    # Successfully got state data (already extracted by device.get_state)
+                    combined_data.update(state_result)
+
                 # Process info result
                 if isinstance(info_result, DLightError):
-                    _LOGGER.warning("Failed to query device info for %s: %s", name, info_result)
+                    _LOGGER.warning(
+                        "Failed to query device info for %s: %s", name, info_result)
                     # Don't fail update just because info failed, but log it
-                    info_data = {} # Ensure info_data is empty dict
                 elif isinstance(info_result, Exception):
-                     _LOGGER.error("Unexpected error querying info for %s: %s", name, info_result)
-                     info_data = {}
-                elif not info_result or info_result.get("status") != "SUCCESS":
-                    _LOGGER.warning("Invalid or non-SUCCESS info data received for %s: %s", name, info_result)
-                    info_data = {}
-                else:
-                    # Extract relevant info fields
-                    info_data = {
+                    _LOGGER.error(
+                        "Unexpected error querying info for %s: %s", name, info_result, exc_info=True)
+                elif not isinstance(info_result, dict):
+                    _LOGGER.warning(
+                        "Invalid info data type received for %s: %s", name, type(info_result))
+                # Check status if present
+                elif info_result.get("status") == STATUS_SUCCESS:
+                    # Extract relevant info fields if needed for device registry etc.
+                    combined_data.update({
                         "swVersion": info_result.get("swVersion"),
                         "hwVersion": info_result.get("hwVersion"),
                         "deviceModel": info_result.get("deviceModel"),
-                    }
-                
-                combined_data.update(state_data)
-                combined_data.update(info_data)
-                
-                if not state_data and not info_data.get("swVersion"):
-                    raise UpdateFailed(f"Failed to get any valid data from device {name}")
-                
+                    })
+                else:
+                    _LOGGER.warning(
+                        "Non-SUCCESS info data received for %s: %s", name, info_result)
+
+                # Check if we got *any* useful data
+                if not combined_data or ("on" not in combined_data and "swVersion" not in combined_data):
+                    # Raise UpdateFailed only if both state and info seem completely invalid/missing
+                    _LOGGER.warning(
+                        "Failed to get any valid data from device %s, state=%s, info=%s", name, state_result, info_result)
+                    # Re-raise original error if state failed critically
+                    if isinstance(state_result, DLightError):
+                        raise UpdateFailed(f"No valid data") from state_result
+                    if isinstance(info_result, DLightError):
+                        raise UpdateFailed(f"No valid data") from info_result
+                    raise UpdateFailed(
+                        f"Failed to get any valid data from device {name}")
+
+                _LOGGER.debug(
+                    "Coordinator update successful for %s. Data: %s", name, combined_data)
                 return combined_data
-        except asyncio.TimeoutError as err: # Catch asyncio timeout specifically
-            raise UpdateFailed(f"Timeout communicating with dLight {device_id} ({name}): {err}") from err
-        except DLightTimeoutError as err: # Catch library's specific timeout
-            raise UpdateFailed(f"Timeout communicating with dLight {device_id} ({name}): {err}") from err
-        except DLightError as err: # Catch other library errors
-            raise UpdateFailed(f"Error communicating with dLight {device_id} ({name}): {err}") from err
-        except Exception as err: # Catch unexpected errors
+
+        except asyncio.TimeoutError as err:  # Catch asyncio timeout specifically
+            raise UpdateFailed(
+                f"Timeout communicating with dLight {device_id} ({name}): {err}") from err
+        # Catch specific library errors
+        except (DLightTimeoutError, DLightConnectionError) as err:
+            raise UpdateFailed(
+                f"Network error communicating with dLight {device_id} ({name}): {err}") from err
+        except DLightError as err:  # Catch other library errors
+            raise UpdateFailed(
+                f"Error communicating with dLight {device_id} ({name}): {err}") from err
+        except Exception as err:  # Catch unexpected errors during update logic
             _LOGGER.exception("Unexpected error updating dLight %s", name)
-            raise UpdateFailed(f"Unexpected error updating dLight {device_id} ({name}): {err}") from err
+            raise UpdateFailed(
+                f"Unexpected error updating dLight {device_id} ({name}): {err}") from err
 
     coordinator = DataUpdateCoordinator(
         hass,
         _LOGGER,
-        name=f"{name} state",
+        name=f"{name} state coordinator",  # More specific name
         update_method=async_update_data,
         update_interval=UPDATE_INTERVAL,
     )
@@ -148,96 +186,92 @@ async def async_setup_entry(
     await coordinator.async_config_entry_first_refresh()
 
     # Create the entity and add it to Home Assistant
-    async_add_entities([DLightEntity(coordinator, client, entry, name, target_ip, device_id)])
+    # Pass the DLightDevice instance instead of client/ip/id
+    async_add_entities([DLightEntity(coordinator, device, entry)])
 
 
-class DLightEntity(CoordinatorEntity, LightEntity):
-    """Representation of a dLight Light."""
+class DLightEntity(CoordinatorEntity[DataUpdateCoordinator[Dict[str, Any]]], LightEntity):
+    """Representation of a dLight Light using DLightDevice."""
 
-    _attr_has_entity_name = True # Use device name + entity name ("Light")
-    _attr_assumed_state = True # Enable optimistic mode
+    _attr_has_entity_name = True  # Use device name + entity name ("Light")
+    # Optimistic mode assumes commands succeed instantly and updates the state locally
+    # Set to False if you prefer to wait for the next coordinator poll to confirm state
+    _attr_assumed_state = True
 
     def __init__(
         self,
         coordinator: DataUpdateCoordinator,
-        client: AsyncDLightClient, # Use async client type hint
-        entry: ConfigEntry,
-        name: str,
-        ip_address: str,
-        device_id: str,
+        device: DLightDevice,  # Accept DLightDevice instance
+        entry: ConfigEntry,  # Keep entry for unique_id/device_info linkage
     ) -> None:
         """Initialize the light."""
-        super().__init__(coordinator) # Pass coordinator to CoordinatorEntity
-        self.client = client
+        super().__init__(coordinator)  # Pass coordinator to CoordinatorEntity
+        self.device = device  # Store the DLightDevice instance
         self.entry = entry
-        self._ip_address = ip_address
-        self._device_id = device_id
-        # Use entry.title as the base device name if available
-        self._base_name = entry.title or name
+        # Use device properties for attributes
+        self._base_name = entry.title or f"dLight {self.device.id}"
 
         # --- Basic Entity Attributes ---
-        # Unique ID based on device ID provided during setup
-        self._attr_unique_id = f"dlight_{self._device_id}"
+        # Unique ID based on device ID
+        self._attr_unique_id = f"dlight_{self.device.id}"
 
         # --- Internal state attributes for optimistic mode ---
-        # Initialize with None, they will be updated by coordinator or service calls
-        self._attr_is_on = None
-        self._attr_brightness = None
-        self._attr_color_temp_kelvin = None
+        self._optimistic_on: Optional[bool] = None
+        # Store HA brightness (0-255)
+        self._optimistic_brightness: Optional[int] = None
+        self._optimistic_color_temp: Optional[int] = None
 
         # --- Light Specific Attributes ---
-        # Supported features based on API: Brightness and Color Temp
         self._attr_supported_color_modes = {ColorMode.COLOR_TEMP}
-        # Start with COLOR_TEMP as the default mode if supported
         self._attr_color_mode = ColorMode.COLOR_TEMP
-        # Get Kelvin range from docs (or query device info if possible)
+        # Get Kelvin range from docs or device info if available
         self._attr_min_color_temp_kelvin = 2600
         self._attr_max_color_temp_kelvin = 6000
 
-        # Device Info for grouping entities
-        # Link entity to HA device registry
-        device_info_data = coordinator.data or {}
+        # Device Info - build using device properties and coordinator data
+        self._update_device_info()  # Call helper to set initial device info
+
+    @callback
+    def _update_device_info(self) -> None:
+        """Update the DeviceInfo based on current data."""
+        # Use coordinator data for model/sw/hw as it's polled
+        device_info_data = self.coordinator.data or {}
         self._attr_device_info = DeviceInfo(
-            identifiers={(entry.domain, self._device_id)}, # Use domain and unique ID
-            name=self._base_name, # Use name from config entry title
-            manufacturer="Google (via custom integration)", # Or unknown
+            # Use domain and device ID
+            identifiers={(self.entry.domain, self.device.id)},
+            name=self._base_name,  # Use name from config entry title or default
+            manufacturer="dLight (via custom integration)",
             model=device_info_data.get("deviceModel", "dLight"),
             sw_version=device_info_data.get("swVersion"),
             hw_version=device_info_data.get("hwVersion"),
-            configuration_url=f"http://{self._ip_address}", # Basic link
-            # Link to config entry for diagnostics/options
-            # entry_type=config_entries.SOURCE_REAUTH, # Or SOURCE_USER if appropriate
-            # via_device=(entry.domain, "hub_or_bridge_id") # If discovery was via another device
+            configuration_url=f"http://{self.device.ip}",  # Use device IP
         )
 
-    # name property is now handled by setting _attr_has_entity_name = True
-    # and HA using device name + entity description (default "Light")
-
     # --- State Properties ---
-    # These read data fetched by the coordinator OR from optimistic updates
 
     @property
     def available(self) -> bool:
-        """Return True if entity is available (coordinator has data)."""
+        """Return True if entity is available."""
         # Availability based on coordinator success
-        return super().available and self.coordinator.last_update_success
+        # Let CoordinatorEntity handle the base availability check
+        return super().available  # This checks coordinator.last_update_success
 
     @property
     def is_on(self) -> bool | None:
         """Return true if light is on."""
         # Return optimistic state if available, otherwise coordinator data
-        if self._attr_is_on is not None: # Check internal optimistic state first
-            return self._attr_is_on
+        if self._optimistic_on is not None:
+            return self._optimistic_on
         if self.coordinator.data:
             return self.coordinator.data.get("on")
-        return None # Unknown state if coordinator hasn't fetched data
+        return None  # Unknown state
 
     @property
     def brightness(self) -> int | None:
         """Return the brightness of this light between 0..255."""
         # Return optimistic state if available, otherwise coordinator data
-        if self._attr_brightness is not None:
-            return self._attr_brightness
+        if self._optimistic_brightness is not None:
+            return self._optimistic_brightness
         if self.coordinator.data:
             dlight_brightness = self.coordinator.data.get("brightness")
             if dlight_brightness is not None:
@@ -249,8 +283,8 @@ class DLightEntity(CoordinatorEntity, LightEntity):
     def color_temp_kelvin(self) -> int | None:
         """Return the CT color value in Kelvin."""
         # Return optimistic state if available, otherwise coordinator data
-        if self._attr_color_temp_kelvin is not None:
-            return self._attr_color_temp_kelvin
+        if self._optimistic_color_temp is not None:
+            return self._optimistic_color_temp
         # Check coordinator data exists and 'color' key is present
         if self.coordinator.data and isinstance(self.coordinator.data.get("color"), dict):
             return self.coordinator.data["color"].get("temperature")
@@ -260,113 +294,133 @@ class DLightEntity(CoordinatorEntity, LightEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the light on."""
-        brightness_ha = kwargs.get(ATTR_BRIGHTNESS)
+        brightness_ha = kwargs.get(ATTR_BRIGHTNESS)  # HA brightness 0-255
         color_temp_k = kwargs.get(ATTR_COLOR_TEMP_KELVIN)
 
         # Store optimistic state updates locally before writing
-        optimistic_on = True # Assume turn_on means ON
-        optimistic_brightness = self.brightness # Start with current value
-        optimistic_color_temp = self.color_temp_kelvin # Start with current value
+        optimistic_on = True
+        # Start with current known state for brightness/temp if not provided in call
+        optimistic_brightness = brightness_ha if brightness_ha is not None else self.brightness
+        optimistic_color_temp = color_temp_k if color_temp_k is not None else self.color_temp_kelvin
 
         try:
-            # Determine target brightness/temp for optimistic update
-            if brightness_ha is not None:
-                optimistic_brightness = brightness_ha
-            if color_temp_k is not None:
-                optimistic_color_temp = int(color_temp_k)
+            # --- Send Commands using DLightDevice ---
+            tasks = []
+            dlight_brightness = None
 
-            # --- Send Commands to Device ---
-            # If only 'turn_on' is called (no kwargs), send explicit 'on'.
-            if not kwargs:
-                _LOGGER.debug("Turning on %s (explicit call)", self.entity_id)
-                await self.client.set_light_state(self._ip_address, self._device_id, True)
-                # Keep previous brightness/temp for optimistic state if just turning on
-
-            # Set Color Temp (if provided) - Send before brightness? Order might matter.
-            if color_temp_k is not None:
-                _LOGGER.debug("Setting %s color temp to %d K", self.entity_id, optimistic_color_temp)
-                await self.client.set_color_temperature(self._ip_address, self._device_id, optimistic_color_temp)
-                # await asyncio.sleep(0.1) # Optional delay
-
-            # Set Brightness (if provided)
+            # Handle Brightness Conversion and Command
             if brightness_ha is not None:
                 # Convert HA brightness (0-255) to dLight brightness (0-100)
-                dlight_brightness = max(0, min(100, math.ceil((optimistic_brightness / 255) * 100)))
-                _LOGGER.debug("Setting %s brightness to %d%% (%d HA)", self.entity_id, dlight_brightness, optimistic_brightness)
-                # Only send if brightness > 0, otherwise it acts like turn_off
+                dlight_brightness = max(
+                    0, min(100, math.ceil((brightness_ha / 255) * 100)))
                 if dlight_brightness > 0:
-                    await self.client.set_brightness(self._ip_address, self._device_id, dlight_brightness)
+                    _LOGGER.debug("Device %s: Queuing set_brightness to %d%% (%d HA)",
+                                  self.device.id, dlight_brightness, brightness_ha)
+                    tasks.append(self.device.set_brightness(dlight_brightness))
                 else:
-                    # If brightness 0 is requested via turn_on service, treat as turn_off
-                    _LOGGER.debug("Brightness 0 requested via turn_on, calling turn_off instead")
-                    await self.async_turn_off() # Call the turn_off logic
-                    return # Exit turn_on logic
+                    # Brightness 0 means turn off
+                    _LOGGER.debug(
+                        "Device %s: Brightness 0 requested, calling turn_off", self.device.id)
+                    await self.async_turn_off()
+                    return  # Exit turn_on logic
+
+            # Handle Color Temp Command
+            if color_temp_k is not None:
+                _LOGGER.debug(
+                    "Device %s: Queuing set_color_temperature to %d K", self.device.id, color_temp_k)
+                tasks.append(
+                    self.device.set_color_temperature(int(color_temp_k)))
+
+            # Handle Turn On Command
+            # Only send explicit 'turn_on' if no brightness/color temp change is also requested,
+            # as setting brightness > 0 or color temp implicitly turns the light on.
+            # Or always send turn_on first? Let's try sending it if needed.
+            # If brightness or color temp is being set, the light will turn on.
+            # If only turn_on is called (no kwargs), we need to send it.
+            # If the light is currently off and brightness/temp is changing, it will turn on.
+            # If the light is already on, sending turn_on again is likely harmless.
+            # Let's send turn_on if no other commands are queued or if it's explicitly called.
+            if not tasks:
+                _LOGGER.debug(
+                    "Device %s: Queuing turn_on (explicit call)", self.device.id)
+                tasks.append(self.device.turn_on())
+            elif not self.is_on:  # If currently off, ensure it turns on
+                _LOGGER.debug(
+                    "Device %s: Queuing turn_on (implicit via brightness/temp)", self.device.id)
+                tasks.insert(0, self.device.turn_on())  # Add turn_on first
+
+            # Execute commands concurrently
+            if tasks:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                # Check for errors in results
+                for i, res in enumerate(results):
+                    if isinstance(res, Exception):
+                        _LOGGER.error(
+                            "Device %s: Error during turn_on sequence (task %d): %s", self.device.id, i, res)
+                        # Raise the first encountered error
+                        raise res
 
             # ---- Optimistic Update ----
-            self._attr_is_on = optimistic_on
-            self._attr_brightness = optimistic_brightness
-            self._attr_color_temp_kelvin = optimistic_color_temp
+            self._optimistic_on = optimistic_on
+            self._optimistic_brightness = optimistic_brightness
+            self._optimistic_color_temp = optimistic_color_temp
             # Handle defaults if turning on from unknown state
-            if self._attr_brightness is None: self._attr_brightness = 255
-            if self._attr_color_temp_kelvin is None: self._attr_color_temp_kelvin = self._attr_min_color_temp_kelvin
+            if self._optimistic_brightness is None:
+                self._optimistic_brightness = 255  # Default to full?
+            if self._optimistic_color_temp is None:
+                self._optimistic_color_temp = self._attr_min_color_temp_kelvin  # Default to min?
 
-            self.async_write_ha_state() # Update HA state immediately
+            self.async_write_ha_state()  # Update HA state immediately
             # --------------------------
 
             # Ask coordinator to refresh state later to confirm
-            # Use schedule_update_ha_state=False as we already updated optimistically
             await self.coordinator.async_request_refresh()
 
         except (DLightError, ValueError) as err:
-            _LOGGER.error("Error controlling dLight %s: %s", self.entity_id, err)
-            # Clear optimistic state on error? Or let coordinator fix it?
-            # Let's clear it to avoid showing wrong state if command failed.
-            self._attr_is_on = None
-            self._attr_brightness = None
-            self._attr_color_temp_kelvin = None
-            self.async_write_ha_state() # Write the cleared state
+            _LOGGER.error("Error controlling dLight %s: %s",
+                          self.device.id, err)
+            # Clear optimistic state on error
+            self._clear_optimistic_state()
+            self.async_write_ha_state()  # Write the cleared state
         except Exception as err:
-            _LOGGER.exception("Unexpected error turning on dLight %s", self.entity_id)
-            # Clear optimistic state
-            self._attr_is_on = None
-            self._attr_brightness = None
-            self._attr_color_temp_kelvin = None
+            _LOGGER.exception(
+                "Unexpected error turning on dLight %s", self.device.id)
+            self._clear_optimistic_state()
             self.async_write_ha_state()
-
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the light off."""
         try:
-            _LOGGER.debug("Turning off %s", self.entity_id)
-            await self.client.set_light_state(self._ip_address, self._device_id, False)
+            _LOGGER.debug("Device %s: Turning off", self.device.id)
+            await self.device.turn_off()  # Use device method
 
             # ---- Optimistic Update ----
-            self._attr_is_on = False
+            self._optimistic_on = False
             # Brightness/Color irrelevant when off, clear optimistic values
-            self._attr_brightness = None
-            self._attr_color_temp_kelvin = None
+            self._optimistic_brightness = None
+            self._optimistic_color_temp = None
             self.async_write_ha_state()
             # --------------------------
 
             # Ask coordinator to refresh state later to confirm
-            # Use schedule_update_ha_state=False as we already updated optimistically
             await self.coordinator.async_request_refresh()
         except DLightError as err:
-            _LOGGER.error("Error turning off dLight %s: %s", self.entity_id, err)
-            # Clear optimistic state
-            self._attr_is_on = None
-            self._attr_brightness = None
-            self._attr_color_temp_kelvin = None
+            _LOGGER.error("Error turning off dLight %s: %s",
+                          self.device.id, err)
+            self._clear_optimistic_state()
             self.async_write_ha_state()
         except Exception as err:
-            _LOGGER.exception("Unexpected error turning off dLight %s", self.entity_id)
-            # Clear optimistic state
-            self._attr_is_on = None
-            self._attr_brightness = None
-            self._attr_color_temp_kelvin = None
+            _LOGGER.exception(
+                "Unexpected error turning off dLight %s", self.device.id)
+            self._clear_optimistic_state()
             self.async_write_ha_state()
 
-    # update method is handled by CoordinatorEntity via coordinator.async_update_data
+    @callback
+    def _clear_optimistic_state(self) -> None:
+        """Clear internal optimistic state variables."""
+        self._optimistic_on = None
+        self._optimistic_brightness = None
+        self._optimistic_color_temp = None
 
     # This method is called by the coordinator after a successful poll
     @callback
@@ -374,12 +428,17 @@ class DLightEntity(CoordinatorEntity, LightEntity):
         """Handle updated data from the coordinator."""
         if self.coordinator.data is None:
             # Don't update if coordinator failed last poll
+            _LOGGER.debug(
+                "Coordinator update skipped for %s, data is None", self.device.id)
             return
 
+        _LOGGER.debug("Handling coordinator update for %s", self.device.id)
         # Clear optimistic state attributes now that we have confirmed data
-        self._attr_is_on = None
-        self._attr_brightness = None
-        self._attr_color_temp_kelvin = None
+        self._clear_optimistic_state()
 
-        # Let the CoordinatorEntity handle updating the state from coordinator.data
+        # Update device info based on potentially new data from coordinator
+        self._update_device_info()
+
+        # Let the CoordinatorEntity handle applying the polled state
+        # to the entity's attributes (_attr_is_on etc. via the properties)
         super()._handle_coordinator_update()

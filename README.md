@@ -1,9 +1,11 @@
 # dLight Home Assistant Integration (`dlight`)
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration) This is a custom integration for Home Assistant to control Google dLight smart lamps locally using the `dlight-client` Python library, which is based on the reverse-engineered local network API.
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration) 
+
+This is a custom integration for Home Assistant to control the dLight smart lamps locally using the `dlight-client` Python library, which is based on the reverse-engineered local network API.
 
 * **Use this integration at your own risk.**
-* This integration is provided for personal/experimental use and carries no official support or warranty from Google or the integration author.
+* This integration is provided for personal/experimental use and carries no official support.
 * Future dLight firmware updates could break this integration without notice.
 
 ## Prerequisites

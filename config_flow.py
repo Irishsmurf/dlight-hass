@@ -5,9 +5,9 @@ from typing import Any
 
 # Import your library and exceptions
 try:
-    from dlightclient.dlight import DLightClient, DLightError, DLightTimeoutError, DLightConnectionError
+    from dlightclient.dlight import AsyncDLightClient, DLightError, DLightTimeoutError, DLightConnectionError
 except ImportError:
-    from .dlightclient.dlight import DLightClient, DLightError, DLightTimeoutError, DLightConnectionError
+    from .dlightclient.dlight import AsyncDLightClient, DLightError, DLightTimeoutError, DLightConnectionError
 
 from homeassistant import config_entries, exceptions
 from homeassistant.core import HomeAssistant
@@ -30,7 +30,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect."""
 
-    client = DLightClient()
+    client = AsyncDLightClient()
     ip_address = data["ip_address"]
     device_id = data["device_id"]
 

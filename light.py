@@ -65,18 +65,68 @@ async def async_setup_entry(
     async def async_update_data():
         """Fetch data from API endpoint."""
         _LOGGER.debug("Polling dLight state for %s", name)
+        
+        state_data = {}
+        info_data = {}
+        combined_data = {}
+
         try:
             # Use the async version of the client library
             async with async_timeout.timeout(10): # Timeout for the update operation
                 # No need for executor job with async library
-                state_data = await client.query_device_state(target_ip, device_id)
-
-                if not state_data or state_data.get("status") != "SUCCESS":
-                    raise UpdateFailed(f"Failed to query device state: {state_data}")
-                # Return only the 'states' dict if present
-                if "states" not in state_data:
-                    raise UpdateFailed(f"Invalid state data received: {state_data}")
-                return state_data["states"]
+                results = await asyncio.gather(
+                    client.query_device_state(target_ip, device_id),
+                    client.query_device_info(target_ip, device_id),
+                    return_exceptions=True
+                )
+                state_result = results[0]
+                info_result = results[1]
+                
+                if isinstance(state_result, DLightError):
+                    _LOGGER.warning("Failed to query device state for %s: %s", name, state_result)
+                    if not isinstance(info_result, dict) or info_result.get("status") != "SUCCESS":
+                        raise UpdateFailed(f"Failed to query essential state for {name}: {state_result}") from state_result
+                elif isinstance(state_result, Exception):
+                    _LOGGER.error("Unexpected error querying state for %s: %s", name, state_result)
+                    if not isinstance(info_result, dict) or info_result.get("status") != "SUCCESS":
+                        raise UpdateFailed(f'Unexpected error querying state for {name}: {state_result}') from state_result
+                elif not state_result or state_result.get("status") != "SUCCESS":
+                    _LOGGER.warning("Invalid or non-SUCCESS state data received for %s: %s", name, state_result)
+                    if not isinstance(info_result, dict) or info_result.get("status") != "SUCCESS":
+                         raise UpdateFailed(f"Invalid state data received for {name}: {state_result}")
+                elif "states" in state_result:
+                    state_data = state_result["states"] # Extract the nested 'states' dict
+                else:
+                     _LOGGER.warning("State data received but missing 'states' key for %s: %s", name, state_result)
+                     if not isinstance(info_result, dict) or info_result.get("status") != "SUCCESS":
+                          raise UpdateFailed(f"State data missing 'states' key for {name}: {state_result}")
+                
+                # Process info result
+                if isinstance(info_result, DLightError):
+                    _LOGGER.warning("Failed to query device info for %s: %s", name, info_result)
+                    # Don't fail update just because info failed, but log it
+                    info_data = {} # Ensure info_data is empty dict
+                elif isinstance(info_result, Exception):
+                     _LOGGER.error("Unexpected error querying info for %s: %s", name, info_result)
+                     info_data = {}
+                elif not info_result or info_result.get("status") != "SUCCESS":
+                    _LOGGER.warning("Invalid or non-SUCCESS info data received for %s: %s", name, info_result)
+                    info_data = {}
+                else:
+                    # Extract relevant info fields
+                    info_data = {
+                        "swVersion": info_result.get("swVersion"),
+                        "hwVersion": info_result.get("hwVersion"),
+                        "deviceModel": info_result.get("deviceModel"),
+                    }
+                
+                combined_data.update(state_data)
+                combined_data.update(info_data)
+                
+                if not state_data and not info_data.get("swVersion"):
+                    raise UpdateFailed(f"Failed to get any valid data from device {name}")
+                
+                return combined_data
         except asyncio.TimeoutError as err: # Catch asyncio timeout specifically
             raise UpdateFailed(f"Timeout communicating with dLight {device_id} ({name}): {err}") from err
         except DLightTimeoutError as err: # Catch library's specific timeout
@@ -147,15 +197,14 @@ class DLightEntity(CoordinatorEntity, LightEntity):
 
         # Device Info for grouping entities
         # Link entity to HA device registry
+        device_info_data = coordinator.data or {}
         self._attr_device_info = DeviceInfo(
             identifiers={(entry.domain, self._device_id)}, # Use domain and unique ID
             name=self._base_name, # Use name from config entry title
-            manufacturer="Google", # Or unknown
-            # Model/SW/HW could be fetched from query_device_info if desired
-            # Example: Fetching from initial coordinator data (might not always be available)
-            # model=self.coordinator.data.get("model", "dLight") if self.coordinator.data else "dLight",
-            # sw_version=self.coordinator.data.get("swVersion") if self.coordinator.data else None,
-            # hw_version=self.coordinator.data.get("hwVersion") if self.coordinator.data else None,
+            manufacturer="Google (via custom integration)", # Or unknown
+            model=device_info_data.get("deviceModel", "dLight"),
+            sw_version=device_info_data.get("swVersion"),
+            hw_version=device_info_data.get("hwVersion"),
             configuration_url=f"http://{self._ip_address}", # Basic link
             # Link to config entry for diagnostics/options
             # entry_type=config_entries.SOURCE_REAUTH, # Or SOURCE_USER if appropriate

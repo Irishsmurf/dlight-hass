@@ -50,7 +50,18 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up dLight light based on a config entry."""
+    """Set up the dLight light platform from a config entry.
+
+    This function is called by Home Assistant to set up the light platform.
+    It retrieves the configuration from the config entry, creates a
+    coordinator for data polling, initializes the `DLightEntity`, and adds
+    it to Home Assistant.
+
+    Args:
+        hass: The Home Assistant instance.
+        entry: The config entry for this platform.
+        async_add_entities: A callback function for adding entities.
+    """
     # Get config data stored during config flow (likely in entry.data)
     # config_data = hass.data[entry.domain][entry.entry_id] # This might not be needed if data is in entry.data
     target_ip = entry.data.get("ip_address")
@@ -190,7 +201,14 @@ async def async_setup_entry(
 
 
 class DLightEntity(CoordinatorEntity[DataUpdateCoordinator[Dict[str, Any]]], LightEntity):
-    """Representation of a dLight Light using DLightDevice."""
+    """Represents a dLight light entity.
+
+    This entity is responsible for communicating with a single dLight device.
+    It uses a `DataUpdateCoordinator` to periodically poll the device for its
+    state and provides methods for controlling the light (turn on/off, set
+    brightness, etc.). The entity also supports optimistic updates for a
+    responsive user experience.
+    """
 
     _attr_has_entity_name = True  # Use device name + entity name ("Light")
     # Optimistic mode assumes commands succeed instantly and updates the state locally
@@ -203,7 +221,13 @@ class DLightEntity(CoordinatorEntity[DataUpdateCoordinator[Dict[str, Any]]], Lig
         device: DLightDevice,  # Accept DLightDevice instance
         entry: ConfigEntry,  # Keep entry for unique_id/device_info linkage
     ) -> None:
-        """Initialize the light."""
+        """Initialize the dLight entity.
+
+        Args:
+            coordinator: The data update coordinator for this entity.
+            device: The `DLightDevice` instance for this light.
+            entry: The config entry associated with this entity.
+        """
         super().__init__(coordinator)  # Pass coordinator to CoordinatorEntity
         self.device = device  # Store the DLightDevice instance
         self.entry = entry
@@ -232,7 +256,12 @@ class DLightEntity(CoordinatorEntity[DataUpdateCoordinator[Dict[str, Any]]], Lig
 
     @callback
     def _update_device_info(self) -> None:
-        """Update the DeviceInfo based on current data."""
+        """Update the DeviceInfo for the entity.
+
+        This method populates the `device_info` attribute with data from the
+        coordinator, such as model, software version, and hardware version.
+        This information is then displayed in the Home Assistant UI.
+        """
         # Use coordinator data for model/sw/hw as it's polled
         device_info_data = self.coordinator.data or {}
         self._attr_device_info = DeviceInfo(
@@ -250,14 +279,30 @@ class DLightEntity(CoordinatorEntity[DataUpdateCoordinator[Dict[str, Any]]], Lig
 
     @property
     def available(self) -> bool:
-        """Return True if entity is available."""
+        """Return True if the entity is available.
+
+        The availability is determined by the success of the last coordinator
+        update. If the coordinator fails to poll the device, this property
+        will return False.
+
+        Returns:
+            True if the entity is available, False otherwise.
+        """
         # Availability based on coordinator success
         # Let CoordinatorEntity handle the base availability check
         return super().available  # This checks coordinator.last_update_success
 
     @property
     def is_on(self) -> bool | None:
-        """Return true if light is on."""
+        """Return the current on/off state of the light.
+
+        This property returns the optimistic state if available, otherwise it
+        falls back to the state reported by the coordinator.
+
+        Returns:
+            True if the light is on, False if it is off, or None if the
+            state is unknown.
+        """
         # Return optimistic state if available, otherwise coordinator data
         if self._optimistic_on is not None:
             return self._optimistic_on
@@ -267,7 +312,17 @@ class DLightEntity(CoordinatorEntity[DataUpdateCoordinator[Dict[str, Any]]], Lig
 
     @property
     def brightness(self) -> int | None:
-        """Return the brightness of this light between 0..255."""
+        """Return the current brightness of the light.
+
+        The brightness is scaled from the dLight's 0-100 range to Home
+        Assistant's 0-255 range. This property returns the optimistic state
+        if available, otherwise it falls back to the state reported by the
+        coordinator.
+
+        Returns:
+            The brightness of the light (0-255), or None if the state is
+            unknown.
+        """
         # Return optimistic state if available, otherwise coordinator data
         if self._optimistic_brightness is not None:
             return self._optimistic_brightness
@@ -280,7 +335,15 @@ class DLightEntity(CoordinatorEntity[DataUpdateCoordinator[Dict[str, Any]]], Lig
 
     @property
     def color_temp_kelvin(self) -> int | None:
-        """Return the CT color value in Kelvin."""
+        """Return the current color temperature of the light in Kelvin.
+
+        This property returns the optimistic state if available, otherwise it
+        falls back to the state reported by the coordinator.
+
+        Returns:
+            The color temperature of the light in Kelvin, or None if the
+            state is unknown.
+        """
         # Return optimistic state if available, otherwise coordinator data
         if self._optimistic_color_temp is not None:
             return self._optimistic_color_temp
@@ -292,7 +355,17 @@ class DLightEntity(CoordinatorEntity[DataUpdateCoordinator[Dict[str, Any]]], Lig
     # --- Service Call Handlers ---
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the light on."""
+        """Turn the light on.
+
+        This method sends the necessary command(s) to the dLight device to
+        turn it on. It can also handle setting the brightness and color
+        temperature at the same time. An optimistic state is set immediately
+        for a responsive UI.
+
+        Args:
+            **kwargs: A dictionary of additional arguments, such as
+                      `ATTR_BRIGHTNESS` and `ATTR_COLOR_TEMP_KELVIN`.
+        """
         brightness_ha = kwargs.get(ATTR_BRIGHTNESS)  # HA brightness 0-255
         color_temp_k = kwargs.get(ATTR_COLOR_TEMP_KELVIN)
 
@@ -388,7 +461,14 @@ class DLightEntity(CoordinatorEntity[DataUpdateCoordinator[Dict[str, Any]]], Lig
             self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the light off."""
+        """Turn the light off.
+
+        This method sends the command to the dLight device to turn it off.
+        An optimistic state is set immediately for a responsive UI.
+
+        Args:
+            **kwargs: A dictionary of additional arguments (not used).
+        """
         try:
             _LOGGER.debug("Device %s: Turning off", self.device.id)
             await self.device.turn_off()  # Use device method
@@ -416,7 +496,11 @@ class DLightEntity(CoordinatorEntity[DataUpdateCoordinator[Dict[str, Any]]], Lig
 
     @callback
     def _clear_optimistic_state(self) -> None:
-        """Clear internal optimistic state variables."""
+        """Clear the internal optimistic state variables.
+
+        This is called when the coordinator provides a new, confirmed state
+        or when an error occurs during a service call.
+        """
         self._optimistic_on = None
         self._optimistic_brightness = None
         self._optimistic_color_temp = None
@@ -424,7 +508,13 @@ class DLightEntity(CoordinatorEntity[DataUpdateCoordinator[Dict[str, Any]]], Lig
     # This method is called by the coordinator after a successful poll
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
+        """Handle updated data from the coordinator.
+
+        This method is called by the `CoordinatorEntity` base class when the
+        coordinator successfully fetches new data. It clears the optimistic
+        state, updates the device info, and triggers a state update for the
+        entity.
+        """
         if self.coordinator.data is None:
             # Don't update if coordinator failed last poll
             _LOGGER.debug(

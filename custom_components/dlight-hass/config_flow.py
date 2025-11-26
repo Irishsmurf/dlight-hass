@@ -53,18 +53,24 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
-    """
-    Validate the user input allows us to connect to the device.
+    """Validate the user input to ensure connection to the dLight device.
+
+    This function attempts to connect to the dLight device using the provided
+    IP address and device ID. It queries the device for its information to
+    confirm that the details are correct and the device is reachable.
 
     Args:
-        hass: Home Assistant instance.
-        data: Dictionary of user input (ip_address, device_id, name).
+        hass: The Home Assistant instance.
+        data: A dictionary containing the user's input, including
+              `ip_address`, `device_id`, and an optional `name`.
 
     Returns:
-        Dictionary with title for the config entry on success.
+        A dictionary containing the title for the config entry, which is
+        determined from the user-provided name or the device model.
 
     Raises:
-        CannotConnect: If connection or validation fails.
+        CannotConnect: If the connection fails, times out, or the device
+                       returns an invalid response.
     """
     if not _IMPORT_SUCCESS: # Prevent validation if library failed to import
         raise CannotConnect("dlightclient library not loaded")
@@ -124,7 +130,12 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
 
 class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for dLight."""
+    """Handles the configuration flow for the dLight integration.
+
+    This class manages the user interface for setting up a new dLight device.
+    It prompts the user for connection details, validates them, and creates a
+    config entry if the validation is successful.
+    """
 
     VERSION = 1
     # Optional: Add connection class if relevant
@@ -133,7 +144,21 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle the user initiation or form submission."""
+        """Handle the initial step of the user configuration flow.
+
+        This method is called when the user initiates the integration setup.
+        It displays a form for the user to enter device details. If user_input
+        is provided, it validates the input and creates a config entry upon
+        success. If validation fails, it shows the form again with an error.
+
+        Args:
+            user_input: A dictionary of the user's input from the form, or
+                        None if the form is being displayed for the first time.
+
+        Returns:
+            A FlowResult which is either a form to be shown to the user or a
+            result indicating the flow has finished.
+        """
         errors: dict[str, str] = {}
 
         # Runs when user submits the form

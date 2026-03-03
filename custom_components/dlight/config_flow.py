@@ -16,6 +16,7 @@ try:
         DLightConnectionError,
         DLightResponseError, # Import if needed for more specific error handling
         STATUS_SUCCESS, # Import if needed
+        discover_devices,
     )
     _IMPORT_SUCCESS = True
 except ImportError:
@@ -28,6 +29,7 @@ except ImportError:
     class DLightConnectionError(DLightError): pass
     class DLightResponseError(DLightError): pass
     class AsyncDLightClient: pass
+    async def discover_devices(*args, **kwargs): return []
     STATUS_SUCCESS = "SUCCESS"
 # --- End Updated Library Imports ---
 
@@ -36,12 +38,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
 
-DOMAIN = "dlight-hass"
+from .const import DOMAIN, CONF_DEVICE_ID
 
 _LOGGER = logging.getLogger(__name__)
-
-# Define constants for config flow keys used in this file
-CONF_DEVICE_ID = "device_id"
 
 # Schema for user input form
 STEP_USER_DATA_SCHEMA = vol.Schema(
@@ -133,63 +132,106 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handles the configuration flow for the dLight integration.
 
     This class manages the user interface for setting up a new dLight device.
-    It prompts the user for connection details, validates them, and creates a
-    config entry if the validation is successful.
+    It supports automatic discovery via UDP and manual entry of device details.
     """
 
     VERSION = 1
-    # Optional: Add connection class if relevant
-    # CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
+
+    def __init__(self) -> None:
+        """Initialize the config flow."""
+        self._discovered_devices: dict[str, dict[str, Any]] = {}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle the initial step of the user configuration flow.
 
-        This method is called when the user initiates the integration setup.
-        It displays a form for the user to enter device details. If user_input
-        is provided, it validates the input and creates a config entry upon
-        success. If validation fails, it shows the form again with an error.
-
-        Args:
-            user_input: A dictionary of the user's input from the form, or
-                        None if the form is being displayed for the first time.
-
-        Returns:
-            A FlowResult which is either a form to be shown to the user or a
-            result indicating the flow has finished.
+        If user_input is None, it attempts to discover devices on the network.
+        If devices are found, it shows a selection list. Otherwise, it shows
+        the manual entry form.
         """
+        if user_input is None:
+            # Try discovery
+            try:
+                devices = await discover_devices(discovery_duration=2.0)
+                if devices:
+                    # Filter out already configured devices
+                    current_ids = {
+                        entry.unique_id for entry in self._async_current_entries()
+                    }
+                    self._discovered_devices = {
+                        d["deviceId"]: d
+                        for d in devices
+                        if f"dlight_{d['deviceId']}" not in current_ids
+                    }
+
+                    if self._discovered_devices:
+                        return await self.async_step_discovery()
+            except Exception:
+                _LOGGER.exception("Error during device discovery")
+
+            return await self.async_step_manual()
+
+        return await self.async_step_manual(user_input)
+
+    async def async_step_discovery(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle selection of a discovered device."""
+        if user_input is not None:
+            if user_input["selected_device"] == "manual":
+                return await self.async_step_manual()
+
+            # Process selected device
+            device_id = user_input["selected_device"]
+            device = self._discovered_devices[device_id]
+            
+            user_data = {
+                CONF_IP_ADDRESS: device["ip_address"],
+                CONF_DEVICE_ID: device_id,
+                CONF_NAME: device.get("deviceModel", f"dLight {device_id}"),
+            }
+            # Proceed to validate and create entry
+            return await self.async_step_manual(user_data)
+
+        # Prepare selection list
+        device_options = {
+            id: f"{d.get('deviceModel', 'dLight')} ({d['ip_address']})"
+            for id, d in self._discovered_devices.items()
+        }
+        device_options["manual"] = "Manually add a device"
+
+        return self.async_show_form(
+            step_id="discovery",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("selected_device"): vol.In(device_options),
+                }
+            ),
+        )
+
+    async def async_step_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle manual entry of device details."""
         errors: dict[str, str] = {}
 
-        # Runs when user submits the form
         if user_input is not None:
-            # Set unique ID based on device ID to prevent duplicates
             unique_id = f"dlight_{user_input[CONF_DEVICE_ID]}"
             await self.async_set_unique_id(unique_id)
-            # Check if a config entry with this unique ID already exists
-            self._abort_if_unique_id_configured(updates=user_input)
+            self._abort_if_unique_id_configured()
 
             try:
-                # Validate the user's input by trying to connect/query
                 info = await validate_input(self.hass, user_input)
-
-                # Input is valid, create the config entry
-                _LOGGER.info("Creating config entry for %s with data %s", info['title'], user_input)
                 return self.async_create_entry(title=info["title"], data=user_input)
-
-            except CannotConnect as e:
-                # Specific error indicating connection/validation failure
-                # Use the error message from the exception if desired, or keep generic
+            except CannotConnect:
                 errors["base"] = "cannot_connect"
-                _LOGGER.warning("Validation failed: %s", e)
-            except Exception:  # Catch unforeseen errors during validation/creation
-                _LOGGER.exception("Unexpected exception in config flow user step")
+            except Exception:
+                _LOGGER.exception("Unexpected exception in config flow manual step")
                 errors["base"] = "unknown"
 
-        # Show the form if it's the first step or if errors occurred
-        # Add suggested values from previous input if form is reshown due to error
         return self.async_show_form(
-            step_id="user",
+            step_id="manual",
             data_schema=self.add_suggested_values_to_schema(
                 STEP_USER_DATA_SCHEMA, user_input
             ),

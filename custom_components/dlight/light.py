@@ -18,9 +18,11 @@ from homeassistant.components.light import (
 import logging
 from typing import Any, Dict, Optional
 import math  # For brightness conversion
-import datetime  # For coordinator updates
 import async_timeout  # For coordinator updates
 import asyncio  # For potential delays and timeout errors
+from .const import UPDATE_INTERVAL, CONF_DEVICE_ID, DOMAIN
+
+from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,10 +41,12 @@ try:
 except ImportError:
     # Handle case where library isn't installed (should not happen in HA)
     _LOGGER.error("dlightclient library not found. Please install it.")
-
-# Define update interval for polling
-UPDATE_INTERVAL = datetime.timedelta(
-    seconds=30)  # Example: Poll every 30 seconds
+    class DLightError(Exception): pass
+    class DLightTimeoutError(DLightError): pass
+    class DLightConnectionError(DLightError): pass
+    class AsyncDLightClient: pass
+    class DLightDevice: pass
+    STATUS_SUCCESS = "SUCCESS"
 
 
 async def async_setup_entry(
@@ -64,8 +68,8 @@ async def async_setup_entry(
     """
     # Get config data stored during config flow (likely in entry.data)
     # config_data = hass.data[entry.domain][entry.entry_id] # This might not be needed if data is in entry.data
-    target_ip = entry.data.get("ip_address")
-    device_id = entry.data.get("device_id")
+    target_ip = entry.data.get(CONF_IP_ADDRESS)
+    device_id = entry.data.get(CONF_DEVICE_ID)
     # Get name from config entry (set during config flow) or create default
     name = entry.title or f"dLight {device_id}"
 
@@ -195,6 +199,9 @@ async def async_setup_entry(
     # Fetch initial data so we have states before entity is added
     await coordinator.async_config_entry_first_refresh()
 
+    # Store coordinator for other platforms or tests
+    hass.data[DOMAIN][entry.entry_id] = coordinator
+
     # Create the entity and add it to Home Assistant
     # Pass the DLightDevice instance instead of client/ip/id
     async_add_entities([DLightEntity(coordinator, device, entry)])
@@ -233,6 +240,7 @@ class DLightEntity(CoordinatorEntity[DataUpdateCoordinator[Dict[str, Any]]], Lig
         self.entry = entry
         # Use device properties for attributes
         self._base_name = entry.title or f"dLight {self.device.id}"
+        self._attr_name = None
 
         # --- Basic Entity Attributes ---
         # Unique ID based on device ID

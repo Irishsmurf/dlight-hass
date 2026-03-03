@@ -1,2 +1,2 @@
 async-timeout==5.0.1
-dlight-client==1.2.0
+dlight-client==1.4.0

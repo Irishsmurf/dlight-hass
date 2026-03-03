@@ -3,15 +3,9 @@ import logging
 
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-
-# Potentially import constants if you create const.py
-# from .const import DOMAIN
+from .const import DOMAIN, PLATFORMS
 
 _LOGGER = logging.getLogger(__name__)
-
-# List the platforms that your integration supports.
-PLATFORMS = [Platform.LIGHT] # Or use strings: ["light"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the dLight integration from a config entry.

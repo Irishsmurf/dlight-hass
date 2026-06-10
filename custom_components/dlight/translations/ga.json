@@ -1,0 +1,60 @@
+{
+    "config": {
+        "step": {
+            "discovery": {
+                "title": "Lampaí dLight a aimsíodh",
+                "description": "Roghnaigh lampa aimsithe le cur leis, nó roghnaigh iontráil de láimh.",
+                "data": {
+                    "selected_device": "Gléas"
+                }
+            },
+            "manual": {
+                "title": "Cuir dLight leis de láimh",
+                "data": {
+                    "ip_address": "Seoladh IP",
+                    "device_id": "Aitheantas an ghléis",
+                    "name": "Ainm"
+                },
+                "data_description": {
+                    "ip_address": "Seoladh IPv4 an lampa ar do líonra logánta.",
+                    "device_id": "Clóite ar lipéad an lampa, nó le feiceáil san aip dLight.",
+                    "name": "Ainm cairdiúil roghnach. Úsáidtear múnla an ghléis mar réamhshocrú."
+                }
+            },
+            "reconfigure": {
+                "title": "Athchumraigh dLight",
+                "description": "Nuashonraigh sonraí ceangail an lampa seo.",
+                "data": {
+                    "ip_address": "Seoladh IP",
+                    "device_id": "Aitheantas an ghléis",
+                    "name": "Ainm"
+                },
+                "data_description": {
+                    "ip_address": "Nuashonraigh é seo má thug do ródaire seoladh nua don lampa."
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Theip ar cheangal leis an lampa. Seiceáil an seoladh IP agus aitheantas an ghléis, agus bí cinnte go bhfuil an lampa faoi chumhacht.",
+            "unknown": "Earráid gan choinne. Féach ar logaí Home Assistant le haghaidh sonraí."
+        },
+        "abort": {
+            "already_configured": "Tá an lampa seo cumraithe cheana féin. Athnuadh an seoladh IP atá stóráilte.",
+            "reconfigure_successful": "D'éirigh leis an athchumrú.",
+            "unique_id_mismatch": "Baineann an t-aitheantas gléis sin le lampa eile. Ní féidir leis an athchumrú ach lampa na hiontrála seo a nuashonrú."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Roghanna dLight",
+                "data": {
+                    "poll_interval": "Eatramh fiosraithe (soicindí)"
+                },
+                "data_description": {
+                    "poll_interval": "Cé chomh minic a fhiafraíonn Home Assistant den lampa cén staid ina bhfuil sé. Bíonn luach níos ísle níos sciobtha, agus luach níos airde níos ciúine ar an líonra (5–600 soicind)."
+                }
+            }
+        }
+    }
+}

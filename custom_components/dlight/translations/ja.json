@@ -1,0 +1,60 @@
+{
+    "config": {
+        "step": {
+            "discovery": {
+                "title": "検出されたdLightランプ",
+                "description": "追加する検出済みランプを選択するか、手動入力を選んでください。",
+                "data": {
+                    "selected_device": "デバイス"
+                }
+            },
+            "manual": {
+                "title": "dLightを手動で追加",
+                "data": {
+                    "ip_address": "IPアドレス",
+                    "device_id": "デバイスID",
+                    "name": "名前"
+                },
+                "data_description": {
+                    "ip_address": "ローカルネットワーク上のランプのIPv4アドレス。",
+                    "device_id": "ランプのラベルに記載されているか、dLightアプリで確認できます。",
+                    "name": "任意のフレンドリ名。デフォルトはデバイスのモデル名です。"
+                }
+            },
+            "reconfigure": {
+                "title": "dLightの再設定",
+                "description": "このランプの接続情報を更新します。",
+                "data": {
+                    "ip_address": "IPアドレス",
+                    "device_id": "デバイスID",
+                    "name": "名前"
+                },
+                "data_description": {
+                    "ip_address": "ルーターがランプに新しいアドレスを割り当てた場合は、ここを更新してください。"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "ランプに接続できませんでした。IPアドレスとデバイスIDを確認し、ランプの電源が入っていることを確認してください。",
+            "unknown": "予期しないエラーです。詳細はHome Assistantのログを確認してください。"
+        },
+        "abort": {
+            "already_configured": "このランプはすでに設定されています。保存されているIPアドレスを更新しました。",
+            "reconfigure_successful": "再設定が完了しました。",
+            "unique_id_mismatch": "このデバイスIDは別のランプのものです。再設定では、このエントリのランプのみ更新できます。"
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "dLightオプション",
+                "data": {
+                    "poll_interval": "ポーリング間隔（秒）"
+                },
+                "data_description": {
+                    "poll_interval": "Home Assistantがランプの状態を確認する頻度です。短いほど反応が速く、長いほどネットワークの負荷が減ります（5〜600秒）。"
+                }
+            }
+        }
+    }
+}

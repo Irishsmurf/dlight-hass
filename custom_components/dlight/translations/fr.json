@@ -1,0 +1,60 @@
+{
+    "config": {
+        "step": {
+            "discovery": {
+                "title": "Lampes dLight découvertes",
+                "description": "Sélectionnez une lampe découverte à ajouter, ou choisissez la saisie manuelle.",
+                "data": {
+                    "selected_device": "Appareil"
+                }
+            },
+            "manual": {
+                "title": "Ajouter une dLight manuellement",
+                "data": {
+                    "ip_address": "Adresse IP",
+                    "device_id": "Identifiant de l'appareil",
+                    "name": "Nom"
+                },
+                "data_description": {
+                    "ip_address": "L'adresse IPv4 de la lampe sur votre réseau local.",
+                    "device_id": "Imprimé sur l'étiquette de la lampe ou affiché dans l'application dLight.",
+                    "name": "Nom convivial facultatif. Par défaut, le modèle de l'appareil."
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigurer la dLight",
+                "description": "Mettez à jour les informations de connexion de cette lampe.",
+                "data": {
+                    "ip_address": "Adresse IP",
+                    "device_id": "Identifiant de l'appareil",
+                    "name": "Nom"
+                },
+                "data_description": {
+                    "ip_address": "Mettez à jour ceci si votre routeur a attribué une nouvelle adresse à la lampe."
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Échec de la connexion à la lampe. Vérifiez l'adresse IP et l'identifiant de l'appareil, et assurez-vous que la lampe est alimentée.",
+            "unknown": "Erreur inattendue. Consultez les journaux de Home Assistant pour plus de détails."
+        },
+        "abort": {
+            "already_configured": "Cette lampe est déjà configurée. Son adresse IP enregistrée a été actualisée.",
+            "reconfigure_successful": "La reconfiguration a réussi.",
+            "unique_id_mismatch": "Cet identifiant appartient à une autre lampe. La reconfiguration ne peut mettre à jour que la lampe de cette entrée."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Options dLight",
+                "data": {
+                    "poll_interval": "Intervalle d'interrogation (secondes)"
+                },
+                "data_description": {
+                    "poll_interval": "Fréquence à laquelle Home Assistant interroge la lampe sur son état actuel. Plus bas, c'est plus réactif ; plus haut, c'est plus léger pour le réseau (5 à 600 secondes)."
+                }
+            }
+        }
+    }
+}

@@ -13,12 +13,14 @@ This is a custom integration for Home Assistant to control dLight smart lamps lo
 
 - **Automatic Discovery:** Automatically find dLight devices on your network.
 - **Full Control:** Turn them on/off, adjust brightness (0-100%), and change the color temperature (2600K - 6000K).
-- **Local Control:** No cloud dependency, purely local network communication.
-- **State Reporting:** Polls the device periodically (configurable, default 30s) to keep states in sync.
+- **Local Control:** Purely local network communication using persistent TCP connections for reduced latency and connection churn.
+- **State Reporting:** Polls the device periodically (30s) to keep states in sync.
 - **Optimistic Updates:** Immediate UI response upon command.
 - **IP Self-Healing:** If your router hands a lamp a new address, re-running discovery (or re-adding the lamp) updates the stored IP automatically — no need to delete and re-add.
 - **Reconfigure Support:** Update a lamp's connection details from the UI (entry menu → Reconfigure).
 - **Diagnostics:** Download a sanitized snapshot (IP and device ID redacted) for bug reports.
+- **Improved Reliability:** Uses `ServiceValidationError` for translatable, user-friendly error feedback in the UI.
+- **Platinum Identification:** Supports hardware tracking via MAC address for more robust device registry integration.
 - **Translations:** English, German, French, Japanese, and Irish.
 
 ## Prerequisites
@@ -51,20 +53,14 @@ Configuration is handled through the Home Assistant UI:
 4.  The integration will automatically attempt to **discover** devices.
 5.  Select your device from the list or choose to add one manually using its **IP Address** and **Device ID**.
 
-### Options
-
-Per-lamp options are available under **Settings** -> **Devices & Services** -> **dLight** -> **Configure**:
-
-- **Poll interval** (5-600 seconds, default 30): how often Home Assistant asks the lamp for its current state. Lower is snappier; higher is quieter on the network.
-
-If a lamp's IP address changes, use **Reconfigure** from the same menu — or simply re-run **Add Integration**, and discovery will heal the stored address automatically.
+If a lamp's IP address changes, use **Reconfigure** from the entry menu — or simply re-run **Add Integration**, and discovery will heal the stored address automatically.
 
 ## Troubleshooting
 
 - **Device Unavailable:**
   - Ensure the dLight is powered on and connected to your Wi-Fi.
   - Check the Home Assistant logs for connection errors.
-  - If the lamp's IP changed, see the Options section above.
+  - If the lamp's IP changed, re-run discovery or use **Reconfigure**.
 - **Manual Configuration:**
   - If discovery fails, you can find the IP and Device ID via your router's client list.
 - **Reporting Bugs:**

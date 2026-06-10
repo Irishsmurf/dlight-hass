@@ -46,10 +46,10 @@
     },
     "exceptions": {
         "turn_on_failed": {
-            "message": "Failed to turn on {device_name}. Device reported: {error}"
+            "message": "Fehler beim Einschalten von {device_name}. Das Gerät meldete: {error}"
         },
         "turn_off_failed": {
-            "message": "Failed to turn off {device_name}. Device reported: {error}"
+            "message": "Fehler beim Ausschalten von {device_name}. Das Gerät meldete: {error}"
         }
     }
 }

@@ -46,10 +46,10 @@
     },
     "exceptions": {
         "turn_on_failed": {
-            "message": "Failed to turn on {device_name}. Device reported: {error}"
+            "message": "{device_name} のオンに失敗しました。デバイスの報告: {error}"
         },
         "turn_off_failed": {
-            "message": "Failed to turn off {device_name}. Device reported: {error}"
+            "message": "{device_name} のオフに失敗しました。デバイスの報告: {error}"
         }
     }
 }

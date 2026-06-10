@@ -33,6 +33,11 @@ from .coordinator import DLightCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+# Serialize HA service calls per lamp: rapid UI interactions must not race
+# overlapping commands at a single-socket device. Coordinator polling is
+# unaffected — this only gates entity commands (turn_on/turn_off).
+PARALLEL_UPDATES = 1
+
 
 def _to_ha_brightness(percent: int) -> int:
     """Scale dLight brightness (0-100%) to HA brightness (0-255).

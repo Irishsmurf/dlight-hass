@@ -14,8 +14,12 @@ This is a custom integration for Home Assistant to control dLight smart lamps lo
 - **Automatic Discovery:** Automatically find dLight devices on your network.
 - **Full Control:** Turn them on/off, adjust brightness (0-100%), and change the color temperature (2600K - 6000K).
 - **Local Control:** No cloud dependency, purely local network communication.
-- **State Reporting:** Polls the device periodically (30s) to keep states in sync.
+- **State Reporting:** Polls the device periodically (configurable, default 30s) to keep states in sync.
 - **Optimistic Updates:** Immediate UI response upon command.
+- **IP Self-Healing:** If your router hands a lamp a new address, re-running discovery (or re-adding the lamp) updates the stored IP automatically — no need to delete and re-add.
+- **Reconfigure Support:** Update a lamp's connection details from the UI (entry menu → Reconfigure).
+- **Diagnostics:** Download a sanitized snapshot (IP and device ID redacted) for bug reports.
+- **Translations:** English, German, French, Japanese, and Irish.
 
 ## Prerequisites
 
@@ -47,13 +51,29 @@ Configuration is handled through the Home Assistant UI:
 4.  The integration will automatically attempt to **discover** devices.
 5.  Select your device from the list or choose to add one manually using its **IP Address** and **Device ID**.
 
+### Options
+
+Per-lamp options are available under **Settings** -> **Devices & Services** -> **dLight** -> **Configure**:
+
+- **Poll interval** (5-600 seconds, default 30): how often Home Assistant asks the lamp for its current state. Lower is snappier; higher is quieter on the network.
+
+If a lamp's IP address changes, use **Reconfigure** from the same menu — or simply re-run **Add Integration**, and discovery will heal the stored address automatically.
+
 ## Troubleshooting
 
 - **Device Unavailable:**
   - Ensure the dLight is powered on and connected to your Wi-Fi.
   - Check the Home Assistant logs for connection errors.
+  - If the lamp's IP changed, see the Options section above.
 - **Manual Configuration:**
   - If discovery fails, you can find the IP and Device ID via your router's client list.
+- **Reporting Bugs:**
+  - Attach the integration's diagnostics (device page -> **Download diagnostics**); IP addresses and device IDs are redacted automatically.
+
+## Development
+
+- Run the test suite with `pytest` (see `AGENTS.md` for architecture notes).
+- The `brand/` directory holds logo assets staged for a future [home-assistant/brands](https://github.com/home-assistant/brands) submission; Home Assistant does not read them from this repository.
 
 **Disclaimer:**
 - Use at your own risk. This is a personal project and carries no official support.

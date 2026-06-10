@@ -159,10 +159,10 @@ async def test_light_coordinator_error(hass, mock_dlight_device, mock_config_ent
     # Verify initial availability
     assert hass.states.get("light.test_light").state == "on"
 
-    # Mock a connection error during poll for both state and info
+    # Mock a connection error during the state poll (info is only fetched
+    # once at setup, so it plays no part in ongoing availability)
     from dlightclient import DLightConnectionError
     mock_dlight_device.get_state.side_effect = DLightConnectionError("Connection failed")
-    mock_dlight_device.get_info.side_effect = DLightConnectionError("Connection failed")
 
     # Trigger poll
     await coordinator.async_refresh()
@@ -171,6 +171,25 @@ async def test_light_coordinator_error(hass, mock_dlight_device, mock_config_ent
     # Verify unavailability
     state = hass.states.get("light.test_light")
     assert state.state == "unavailable"
+
+async def test_light_setup_with_info_failure(hass, mock_dlight_device, mock_config_entry):
+    """A failed device info query must not block entity creation.
+
+    Info is cosmetic (registry card); the entity should still appear with a
+    generic model as long as the state poll works.
+    """
+    from dlightclient import DLightConnectionError
+    mock_dlight_device.get_info.side_effect = DLightConnectionError("info offline")
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.dlight.light.AsyncDLightClient", autospec=True):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    state = hass.states.get("light.test_light")
+    assert state is not None
+    assert state.state == "on"
+    assert state.attributes.get("brightness") == 128
 
 async def test_light_turn_on_no_args(hass, mock_dlight_device, mock_config_entry):
     """Test turning on the light without any extra arguments."""

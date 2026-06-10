@@ -9,6 +9,10 @@ Flow map::
                           validate_input() probes the lamp
                                        │
                                  create entry
+
+Two extra paths keep entries pointing at the right IP after DHCP changes:
+the user step silently heals known lamps rediscovered on a new address, and
+async_step_reconfigure lets the user edit a lamp's details from the UI.
 """
 from __future__ import annotations
 
@@ -103,11 +107,26 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.exception("dLight discovery failed; falling back to manual entry")
             devices = []
 
-        # Hide lamps that already have a config entry (matched by unique_id).
-        known = {entry.unique_id for entry in self._async_current_entries()}
-        self._discovered = {
-            d["deviceId"]: d for d in devices if f"dlight_{d['deviceId']}" not in known
-        }
+        # Split discoveries: unknown lamps go to the pick-list; known lamps
+        # (matched by unique_id) get their stored IP self-healed if the
+        # router handed them a new address since setup.
+        known = {entry.unique_id: entry for entry in self._async_current_entries()}
+        self._discovered = {}
+        for found in devices:
+            entry = known.get(f"dlight_{found['deviceId']}")
+            if entry is None:
+                self._discovered[found["deviceId"]] = found
+            elif entry.data.get(CONF_IP_ADDRESS) != found["ip_address"]:
+                _LOGGER.info(
+                    "dLight %s moved to %s; updating its config entry",
+                    found["deviceId"],
+                    found["ip_address"],
+                )
+                self.hass.config_entries.async_update_entry(
+                    entry, data={**entry.data, CONF_IP_ADDRESS: found["ip_address"]}
+                )
+                # Reload so the running coordinator targets the new address.
+                self.hass.config_entries.async_schedule_reload(entry.entry_id)
 
         if self._discovered:
             return await self.async_step_discovery()
@@ -150,9 +169,12 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # One entry per physical lamp, keyed by device id.
+            # One entry per physical lamp, keyed by device id. Re-adding a
+            # known lamp aborts, but heals its stored IP as a side effect.
             await self.async_set_unique_id(f"dlight_{user_input[CONF_DEVICE_ID]}")
-            self._abort_if_unique_id_configured()
+            self._abort_if_unique_id_configured(
+                updates={CONF_IP_ADDRESS: user_input[CONF_IP_ADDRESS]}
+            )
 
             try:
                 info = await validate_input(self.hass, user_input)
@@ -170,6 +192,40 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="manual",
             data_schema=self.add_suggested_values_to_schema(
                 STEP_USER_DATA_SCHEMA, user_input
+            ),
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Let the user fix a lamp's details — typically a changed IP address."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            # Reconfigure must keep pointing at the same physical lamp; a
+            # different device id means the user wants a new entry instead.
+            await self.async_set_unique_id(f"dlight_{user_input[CONF_DEVICE_ID]}")
+            self._abort_if_unique_id_mismatch()
+
+            try:
+                info = await validate_input(self.hass, user_input)
+            except CannotConnect:
+                errors["base"] = "cannot_connect"
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Unexpected error in dLight reconfigure step")
+                errors["base"] = "unknown"
+            else:
+                # Persist the new details and restart the entry against them.
+                return self.async_update_reload_and_abort(
+                    entry, title=info["title"], data=user_input
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                STEP_USER_DATA_SCHEMA, user_input or entry.data
             ),
             errors=errors,
         )

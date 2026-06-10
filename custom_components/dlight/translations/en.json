@@ -1,0 +1,47 @@
+{
+    "config": {
+        "step": {
+            "discovery": {
+                "title": "Discovered dLight lamps",
+                "description": "Select a discovered lamp to add, or choose manual entry.",
+                "data": {
+                    "selected_device": "Device"
+                }
+            },
+            "manual": {
+                "title": "Add a dLight manually",
+                "data": {
+                    "ip_address": "IP address",
+                    "device_id": "Device ID",
+                    "name": "Name"
+                },
+                "data_description": {
+                    "ip_address": "The lamp's IPv4 address on your local network.",
+                    "device_id": "Printed on the lamp's label, or shown in the dLight app.",
+                    "name": "Optional friendly name. Defaults to the device model."
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigure dLight",
+                "description": "Update the connection details for this lamp.",
+                "data": {
+                    "ip_address": "IP address",
+                    "device_id": "Device ID",
+                    "name": "Name"
+                },
+                "data_description": {
+                    "ip_address": "Update this if your router assigned the lamp a new address."
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Failed to connect to the lamp. Check the IP address and device ID, and make sure the lamp is powered.",
+            "unknown": "Unexpected error. Check the Home Assistant logs for details."
+        },
+        "abort": {
+            "already_configured": "This lamp is already configured. Its stored IP address has been refreshed.",
+            "reconfigure_successful": "Reconfiguration was successful.",
+            "unique_id_mismatch": "That device ID belongs to a different lamp. Reconfigure can only update this entry's lamp."
+        }
+    }
+}

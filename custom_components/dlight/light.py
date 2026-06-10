@@ -1,11 +1,11 @@
 """Light platform for dLight.
 
-Architecture in one paragraph: a DLightCoordinator polls the lamp every
-UPDATE_INTERVAL and caches the merged state/info payload. DLightEntity is a
-thin read-only view over that cache, with one twist — *optimistic* state.
-Commands (turn on, set brightness, ...) update the entity's state immediately
-so the UI feels instant; the next confirmed poll replaces the guess with the
-device's reported truth.
+Architecture in one paragraph: a DLightCoordinator reads the lamp's static
+identity (model, firmware) once at setup, then polls only its state every
+UPDATE_INTERVAL. DLightEntity is a thin read-only view over that cache, with
+one twist — *optimistic* state. Commands (turn on, set brightness, ...)
+update the entity's state immediately so the UI feels instant; the next
+confirmed poll replaces the guess with the device's reported truth.
 """
 from __future__ import annotations
 
@@ -100,15 +100,14 @@ async def async_setup_entry(
 
 
 class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Polls one lamp and merges its two payloads into a single flat dict.
+    """Owns all communication with one lamp.
 
-    The lamp answers two separate queries:
-      * get_state -> {"on": bool, "brightness": 0-100, "color": {"temperature": K}}
-      * get_info  -> {"status": ..., "swVersion": ..., "hwVersion": ..., "deviceModel": ...}
-
-    Either may fail independently (these lamps can be flaky), so each result
-    is graded on its own; the poll only counts as failed — flipping the entity
-    to unavailable — when *neither* query produced usable data.
+    Two payloads, two cadences:
+      * get_info  -> model / firmware / hardware versions. These never change
+        between polls, so they are fetched ONCE (in _async_setup) and cached
+        in `self.info` for the device registry card.
+      * get_state -> {"on": bool, "brightness": 0-100, "color": {"temperature": K}}.
+        This is the actual poll target, every UPDATE_INTERVAL.
     """
 
     def __init__(self, hass: HomeAssistant, device: DLightDevice, name: str) -> None:
@@ -120,48 +119,55 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             update_interval=UPDATE_INTERVAL,
         )
         self.device = device
+        # Static identity, filled once by _async_setup before the first poll.
+        self.info: dict[str, Any] = {}
 
-    async def _async_update_data(self) -> dict[str, Any]:
-        """Fetch state + info concurrently and merge whatever succeeded."""
+    async def _async_setup(self) -> None:
+        """Fetch the lamp's static info once, before the first state poll.
+
+        Failure is tolerated: the info payload is cosmetic (device registry
+        card), and a lamp that can't answer get_info may still control fine.
+        """
         try:
             async with asyncio.timeout(POLL_TIMEOUT):
-                # return_exceptions=True: one query failing must not cancel
-                # the other — each result is inspected separately below.
-                state, info = await asyncio.gather(
-                    self.device.get_state(),
-                    self.device.get_info(),
-                    return_exceptions=True,
-                )
-        except TimeoutError as err:
-            raise UpdateFailed(f"Timeout polling dLight {self.device.id}") from err
-
-        data: dict[str, Any] = {}
-
-        if isinstance(state, dict):
-            data.update(state)
-        else:
-            _LOGGER.warning("State query failed for %s: %s", self.device.id, state)
+                info = await self.device.get_info()
+        except (TimeoutError, DLightError) as err:
+            _LOGGER.warning(
+                "Could not read device info for %s (will show generic card): %s",
+                self.device.id,
+                err,
+            )
+            return
 
         if isinstance(info, dict) and info.get("status") == STATUS_SUCCESS:
             # Only the fields the device registry cares about.
-            data.update(
-                {key: info.get(key) for key in ("swVersion", "hwVersion", "deviceModel")}
-            )
+            self.info = {
+                key: info.get(key) for key in ("swVersion", "hwVersion", "deviceModel")
+            }
         else:
-            _LOGGER.warning("Info query failed for %s: %s", self.device.id, info)
-
-        # "on" proves state arrived; "swVersion" proves info arrived. With
-        # neither, this poll produced nothing worth caching: report failure
-        # and chain the root cause so the log shows *why*.
-        if "on" not in data and "swVersion" not in data:
-            cause = next(
-                (r for r in (state, info) if isinstance(r, BaseException)), None
+            _LOGGER.warning(
+                "Device info query for %s returned no usable data: %s",
+                self.device.id,
+                info,
             )
-            raise UpdateFailed(
-                f"No valid data from dLight {self.device.id}"
-            ) from cause
 
-        return data
+    async def _async_update_data(self) -> dict[str, Any]:
+        """Poll the lamp's current state; any failure marks it unavailable."""
+        try:
+            async with asyncio.timeout(POLL_TIMEOUT):
+                state = await self.device.get_state()
+        except TimeoutError as err:
+            raise UpdateFailed(f"Timeout polling dLight {self.device.id}") from err
+        except DLightError as err:
+            raise UpdateFailed(
+                f"Error polling dLight {self.device.id}: {err}"
+            ) from err
+
+        if not isinstance(state, dict):
+            raise UpdateFailed(
+                f"Invalid state payload from dLight {self.device.id}: {state!r}"
+            )
+        return state
 
 
 class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
@@ -199,20 +205,16 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         self._optimistic_brightness: int | None = None  # HA scale, 0-255
         self._optimistic_kelvin: int | None = None
 
-        self._refresh_device_info()
-
-    @callback
-    def _refresh_device_info(self) -> None:
-        """(Re)build the device registry card from the latest poll."""
-        data = self.coordinator.data or {}
+        # The registry card is built once: coordinator.info is static
+        # (fetched a single time at setup, see DLightCoordinator).
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self.device.id)},
+            identifiers={(DOMAIN, device.id)},
             name=self._base_name,
             manufacturer="dLight (via custom integration)",
-            model=data.get("deviceModel", "dLight"),
-            sw_version=data.get("swVersion"),
-            hw_version=data.get("hwVersion"),
-            configuration_url=f"http://{self.device.ip}",
+            model=coordinator.info.get("deviceModel", "dLight"),
+            sw_version=coordinator.info.get("swVersion"),
+            hw_version=coordinator.info.get("hwVersion"),
+            configuration_url=f"http://{device.ip}",
         )
 
     # --- State properties: optimistic guess first, coordinator truth second ---
@@ -338,5 +340,4 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         if self.coordinator.data is None:
             return  # failed poll; availability handling is CoordinatorEntity's job
         self._clear_optimistic_state()
-        self._refresh_device_info()  # model/sw/hw may change (firmware updates)
         super()._handle_coordinator_update()

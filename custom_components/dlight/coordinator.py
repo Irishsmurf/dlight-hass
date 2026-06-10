@@ -83,7 +83,12 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Poll the lamp's current state; any failure marks it unavailable."""
         try:
             async with asyncio.timeout(POLL_TIMEOUT):
-                state = await self.device.get_state()
+                # force_update bypasses DLightDevice's local state cache.
+                # Since dlight-client 1.5.0 that cache is written optimistically
+                # by command methods (before the lamp confirms), so a plain
+                # get_state() would echo our own guesses back instead of
+                # polling — and a dead lamp would never raise here.
+                state = await self.device.get_state(force_update=True)
         except TimeoutError as err:
             raise UpdateFailed(f"Timeout polling dLight {self.device.id}") from err
         except DLightError as err:

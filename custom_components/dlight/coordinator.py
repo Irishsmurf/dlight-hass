@@ -16,7 +16,7 @@ from dlightclient import STATUS_SUCCESS, DLightDevice, DLightError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import POLL_TIMEOUT
+from .const import POLL_INTERVAL, POLL_TIMEOUT
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,14 +37,13 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         hass: HomeAssistant,
         device: DLightDevice,
         name: str,
-        poll_interval: int,
     ) -> None:
         """Initialize the coordinator for a single device."""
         super().__init__(
             hass,
             _LOGGER,
             name=f"{name} state coordinator",
-            update_interval=timedelta(seconds=poll_interval),
+            update_interval=timedelta(seconds=POLL_INTERVAL),
         )
         self.device = device
         # Static identity, filled once by _async_setup before the first poll.
@@ -70,7 +69,8 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if isinstance(info, dict) and info.get("status") == STATUS_SUCCESS:
             # Only the fields the device registry cares about.
             self.info = {
-                key: info.get(key) for key in ("swVersion", "hwVersion", "deviceModel")
+                key: info.get(key)
+                for key in ("swVersion", "hwVersion", "deviceModel", "macAddress")
             }
         else:
             _LOGGER.warning(

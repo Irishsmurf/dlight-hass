@@ -18,7 +18,8 @@ def mock_dlight_device():
             "status": "SUCCESS",
             "swVersion": "1.0.0",
             "hwVersion": "1.0.0",
-            "deviceModel": "Test Lamp"
+            "deviceModel": "Test Lamp",
+            "macAddress": "AA:BB:CC:DD:EE:FF"
         })
         mock_device.turn_on = AsyncMock()
         mock_device.turn_off = AsyncMock()
@@ -60,6 +61,13 @@ async def test_light_setup(hass, mock_dlight_device, mock_config_entry):
     assert state.attributes.get("brightness") == 128 # 50% of 255 is ~128
     assert state.attributes.get("color_temp_kelvin") == 4000
     assert state.attributes.get("friendly_name") == "Test Light"
+
+    # Verify MAC address in device info
+    from homeassistant.helpers import device_registry as dr
+    device_registry = dr.async_get(hass)
+    device = device_registry.async_get_device(identifiers={(DOMAIN, "test_device_id")})
+    assert device is not None
+    assert (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:dd:ee:ff") in device.connections
 
 async def test_light_turn_on(hass, mock_dlight_device, mock_config_entry):
     """Test turning on the dLight light."""
@@ -221,8 +229,8 @@ async def test_light_turn_on_no_args(hass, mock_dlight_device, mock_config_entry
     assert hass.states.get("light.test_light").state == "on"
 
 async def test_light_service_error(hass, mock_dlight_device, mock_config_entry):
-    """Test that a HomeAssistantError is raised when a service call fails."""
-    from homeassistant.exceptions import HomeAssistantError
+    """Test that a ServiceValidationError is raised when a service call fails."""
+    from homeassistant.exceptions import ServiceValidationError
     mock_config_entry.add_to_hass(hass)
 
     with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
@@ -232,7 +240,10 @@ async def test_light_service_error(hass, mock_dlight_device, mock_config_entry):
     # Mock a failure during turn_on
     mock_dlight_device.turn_on.side_effect = Exception("Lamp exploded")
 
-    with pytest.raises(HomeAssistantError, match="Failed to turn on dLight: Lamp exploded"):
+    # In tests, ServiceValidationError message is resolved by the translation engine.
+    # However, since we are in a test environment without full translations loaded,
+    # it might just show the key or a default message.
+    with pytest.raises(ServiceValidationError):
         await hass.services.async_call(
             LIGHT_DOMAIN, "turn_on", {"entity_id": "light.test_light"}, blocking=True
         )

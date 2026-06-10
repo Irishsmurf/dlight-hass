@@ -6,7 +6,7 @@ from homeassistant import config_entries, data_entry_flow
 from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.dlight.const import DOMAIN, CONF_DEVICE_ID, CONF_POLL_INTERVAL
+from custom_components.dlight.const import DOMAIN, CONF_DEVICE_ID
 
 async def test_flow_user_manual(hass):
     """Test manual entry flow."""
@@ -177,43 +177,6 @@ async def test_flow_reconfigure(hass):
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_IP_ADDRESS] == "192.168.1.99"
-
-async def test_options_flow_updates_poll_interval(hass):
-    """Saving a new poll interval reloads the entry with that interval."""
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        data={CONF_IP_ADDRESS: "127.0.0.1", CONF_DEVICE_ID: "test_id"},
-        title="Test Light",
-        unique_id="dlight_test_id",
-    )
-    entry.add_to_hass(hass)
-
-    # Real setup (with the device mocked) so the options-update listener is
-    # registered and runtime_data exists after the reload.
-    with patch("custom_components.dlight.DLightDevice", autospec=True) as mock_device_class, \
-         patch("custom_components.dlight.AsyncDLightClient", autospec=True):
-        mock_device = mock_device_class.return_value
-        mock_device.id = "test_id"
-        mock_device.ip = "127.0.0.1"
-        mock_device.get_state = AsyncMock(return_value={"on": True, "brightness": 50})
-        mock_device.get_info = AsyncMock(return_value={"status": "SUCCESS"})
-
-        assert await hass.config_entries.async_setup(entry.entry_id)
-        await hass.async_block_till_done()
-
-        result = await hass.config_entries.options.async_init(entry.entry_id)
-        assert result["type"] == data_entry_flow.FlowResultType.FORM
-        assert result["step_id"] == "init"
-
-        result = await hass.config_entries.options.async_configure(
-            result["flow_id"], {CONF_POLL_INTERVAL: 60}
-        )
-        await hass.async_block_till_done()  # let the triggered reload settle
-
-    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
-    assert entry.options[CONF_POLL_INTERVAL] == 60
-    # The reloaded coordinator picked up the new interval
-    assert entry.runtime_data.update_interval == timedelta(seconds=60)
 
 async def test_flow_reconfigure_rejects_different_lamp(hass):
     """Reconfigure with a different device id aborts: it must stay the same lamp."""

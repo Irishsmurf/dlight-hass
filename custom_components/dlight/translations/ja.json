@@ -44,17 +44,12 @@
             "unique_id_mismatch": "このデバイスIDは別のランプのものです。再設定では、このエントリのランプのみ更新できます。"
         }
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "dLightオプション",
-                "data": {
-                    "poll_interval": "ポーリング間隔（秒）"
-                },
-                "data_description": {
-                    "poll_interval": "Home Assistantがランプの状態を確認する頻度です。短いほど反応が速く、長いほどネットワークの負荷が減ります（5〜600秒）。"
-                }
-            }
+    "exceptions": {
+        "turn_on_failed": {
+            "message": "Failed to turn on {device_name}. Device reported: {error}"
+        },
+        "turn_off_failed": {
+            "message": "Failed to turn off {device_name}. Device reported: {error}"
         }
     }
 }

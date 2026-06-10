@@ -44,17 +44,12 @@
             "unique_id_mismatch": "Cet identifiant appartient à une autre lampe. La reconfiguration ne peut mettre à jour que la lampe de cette entrée."
         }
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "Options dLight",
-                "data": {
-                    "poll_interval": "Intervalle d'interrogation (secondes)"
-                },
-                "data_description": {
-                    "poll_interval": "Fréquence à laquelle Home Assistant interroge la lampe sur son état actuel. Plus bas, c'est plus réactif ; plus haut, c'est plus léger pour le réseau (5 à 600 secondes)."
-                }
-            }
+    "exceptions": {
+        "turn_on_failed": {
+            "message": "Failed to turn on {device_name}. Device reported: {error}"
+        },
+        "turn_off_failed": {
+            "message": "Failed to turn off {device_name}. Device reported: {error}"
         }
     }
 }

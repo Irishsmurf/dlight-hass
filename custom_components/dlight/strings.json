@@ -44,17 +44,12 @@
             "unique_id_mismatch": "That device ID belongs to a different lamp. Reconfigure can only update this entry's lamp."
         }
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "dLight options",
-                "data": {
-                    "poll_interval": "Poll interval (seconds)"
-                },
-                "data_description": {
-                    "poll_interval": "How often Home Assistant asks the lamp for its current state. Lower is snappier, higher is quieter on the network (5-600 seconds)."
-                }
-            }
+    "exceptions": {
+        "turn_on_failed": {
+            "message": "Failed to turn on {device_name}. Device reported: {error}"
+        },
+        "turn_off_failed": {
+            "message": "Failed to turn off {device_name}. Device reported: {error}"
         }
     }
 }

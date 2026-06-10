@@ -44,17 +44,12 @@
             "unique_id_mismatch": "Baineann an t-aitheantas gléis sin le lampa eile. Ní féidir leis an athchumrú ach lampa na hiontrála seo a nuashonrú."
         }
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "Roghanna dLight",
-                "data": {
-                    "poll_interval": "Eatramh fiosraithe (soicindí)"
-                },
-                "data_description": {
-                    "poll_interval": "Cé chomh minic a fhiafraíonn Home Assistant den lampa cén staid ina bhfuil sé. Bíonn luach níos ísle níos sciobtha, agus luach níos airde níos ciúine ar an líonra (5–600 soicind)."
-                }
-            }
+    "exceptions": {
+        "turn_on_failed": {
+            "message": "Failed to turn on {device_name}. Device reported: {error}"
+        },
+        "turn_off_failed": {
+            "message": "Failed to turn off {device_name}. Device reported: {error}"
         }
     }
 }

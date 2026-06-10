@@ -24,7 +24,8 @@ from homeassistant.components.light import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -109,7 +110,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
         # The registry card is built once: coordinator.info is static
         # (fetched a single time at setup, see DLightCoordinator).
-        self._attr_device_info = DeviceInfo(
+        device_info = DeviceInfo(
             identifiers={(DOMAIN, device.id)},
             name=self._base_name,
             manufacturer="dLight (via custom integration)",
@@ -118,6 +119,9 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             hw_version=coordinator.info.get("hwVersion"),
             configuration_url=f"http://{device.ip}",
         )
+        if mac := coordinator.info.get("macAddress"):
+            device_info["connections"] = {(dr.CONNECTION_NETWORK_MAC, mac)}
+        self._attr_device_info = device_info
 
     # --- State properties: optimistic guess first, coordinator truth second ---
 
@@ -178,7 +182,14 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             _LOGGER.exception("Failed to turn on dLight %s", self.device.id)
             self._clear_optimistic_state()
             self.async_write_ha_state()
-            raise HomeAssistantError(f"Failed to turn on dLight: {err}") from err
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="turn_on_failed",
+                translation_placeholders={
+                    "device_name": self._base_name,
+                    "error": str(err),
+                },
+            ) from err
 
         # Commands accepted: predict the outcome. Values not in this call keep
         # their last known state, with sane defaults when nothing is known.
@@ -206,7 +217,14 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             _LOGGER.exception("Failed to turn off dLight %s", self.device.id)
             self._clear_optimistic_state()
             self.async_write_ha_state()
-            raise HomeAssistantError(f"Failed to turn off dLight: {err}") from err
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="turn_off_failed",
+                translation_placeholders={
+                    "device_name": self._base_name,
+                    "error": str(err),
+                },
+            ) from err
 
         # Predict "off"; brightness/temperature are meaningless while off.
         self._optimistic_on = False

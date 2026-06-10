@@ -14,7 +14,7 @@ from homeassistant.const import CONF_IP_ADDRESS
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError
 
-from .const import CONF_DEVICE_ID, CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL, PLATFORMS
+from .const import CONF_DEVICE_ID, PLATFORMS
 from .coordinator import DLightCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,7 +39,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
         hass,
         device,
         name=entry.title or f"dLight {device_id}",
-        poll_interval=entry.options.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
     )
     # Fetch once before adding entities, so they never appear with unknown
     # state; raises ConfigEntryNotReady (auto-retry) if the lamp is offline.
@@ -49,17 +48,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
     # Ensure the persistent connection is closed when the entry is unloaded.
     entry.async_on_unload(client.close)
 
-    # Options changes (poll interval) apply by reloading the entry, which
-    # rebuilds the coordinator against the new options.
-    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
-
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
-
-
-async def _async_options_updated(hass: HomeAssistant, entry: DLightConfigEntry) -> None:
-    """Reload the entry so updated options take effect."""
-    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bool:

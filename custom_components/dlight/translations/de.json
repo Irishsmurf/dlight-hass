@@ -44,17 +44,12 @@
             "unique_id_mismatch": "Diese Geräte-ID gehört zu einer anderen Lampe. Bei der Neukonfiguration kann nur die Lampe dieses Eintrags aktualisiert werden."
         }
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "dLight-Optionen",
-                "data": {
-                    "poll_interval": "Abfrageintervall (Sekunden)"
-                },
-                "data_description": {
-                    "poll_interval": "Wie oft Home Assistant die Lampe nach ihrem aktuellen Zustand fragt. Niedriger ist reaktionsschneller, höher entlastet das Netzwerk (5–600 Sekunden)."
-                }
-            }
+    "exceptions": {
+        "turn_on_failed": {
+            "message": "Failed to turn on {device_name}. Device reported: {error}"
+        },
+        "turn_off_failed": {
+            "message": "Failed to turn off {device_name}. Device reported: {error}"
         }
     }
 }

@@ -32,9 +32,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
             f"Config entry {entry.entry_id} is missing IP address or device ID"
         )
 
-    device = DLightDevice(
-        ip_address=ip_address, device_id=device_id, client=AsyncDLightClient()
-    )
+    client = AsyncDLightClient(persistent=True)
+    device = DLightDevice(ip_address=ip_address, device_id=device_id, client=client)
 
     coordinator = DLightCoordinator(
         hass,
@@ -46,6 +45,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
     # state; raises ConfigEntryNotReady (auto-retry) if the lamp is offline.
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+
+    # Ensure the persistent connection is closed when the entry is unloaded.
+    entry.async_on_unload(client.close)
 
     # Options changes (poll interval) apply by reloading the entry, which
     # rebuilds the coordinator against the new options.

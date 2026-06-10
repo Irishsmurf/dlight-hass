@@ -219,3 +219,21 @@ async def test_light_turn_on_no_args(hass, mock_dlight_device, mock_config_entry
     # Verify turn_on was called on device
     mock_dlight_device.turn_on.assert_called_once()
     assert hass.states.get("light.test_light").state == "on"
+
+async def test_light_service_error(hass, mock_dlight_device, mock_config_entry):
+    """Test that a HomeAssistantError is raised when a service call fails."""
+    from homeassistant.exceptions import HomeAssistantError
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Mock a failure during turn_on
+    mock_dlight_device.turn_on.side_effect = Exception("Lamp exploded")
+
+    with pytest.raises(HomeAssistantError, match="Failed to turn on dLight: Lamp exploded"):
+        await hass.services.async_call(
+            LIGHT_DOMAIN, "turn_on", {"entity_id": "light.test_light"}, blocking=True
+        )
+

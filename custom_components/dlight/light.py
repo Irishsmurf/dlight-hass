@@ -24,6 +24,7 @@ from homeassistant.components.light import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -173,11 +174,11 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
         try:
             await self._send(commands)
-        except Exception:  # noqa: BLE001 — never let a flaky lamp break the service call
+        except Exception as err:
             _LOGGER.exception("Failed to turn on dLight %s", self.device.id)
             self._clear_optimistic_state()
             self.async_write_ha_state()
-            return
+            raise HomeAssistantError(f"Failed to turn on dLight: {err}") from err
 
         # Commands accepted: predict the outcome. Values not in this call keep
         # their last known state, with sane defaults when nothing is known.
@@ -201,11 +202,11 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         """Turn the light off (optimistically, confirmed by the next poll)."""
         try:
             await self.device.turn_off()
-        except Exception:  # noqa: BLE001 — never let a flaky lamp break the service call
+        except Exception as err:
             _LOGGER.exception("Failed to turn off dLight %s", self.device.id)
             self._clear_optimistic_state()
             self.async_write_ha_state()
-            return
+            raise HomeAssistantError(f"Failed to turn off dLight: {err}") from err
 
         # Predict "off"; brightness/temperature are meaningless while off.
         self._optimistic_on = False

@@ -7,13 +7,7 @@ from custom_components.dlight.const import DOMAIN, CONF_DEVICE_ID
 
 async def test_flow_user_manual(hass):
     """Test manual entry flow."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    
-    # Discovery fails or returns nothing, should go to manual step
-    # Wait, in my implementation it goes to discovery if devices found, else manual
-    # Let's mock discover_devices to return nothing
+    # With no devices discovered, the flow should land on the manual step
     with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -61,8 +55,8 @@ async def test_flow_discovery(hass):
         {"selected_device": "discovered_id"},
     )
     
-    # It should then go to manual step (pre-filled) or create entry?
-    # My implementation goes to manual step with pre-filled data
+    # Selecting a device pre-fills the manual step (validation against the
+    # real network fails here, so the form is shown again)
     assert result["type"] == data_entry_flow.FlowResultType.FORM
     assert result["step_id"] == "manual"
     

@@ -1,59 +1,32 @@
-"""The dLight integration."""
+"""The dLight integration.
+
+Lifecycle: Home Assistant calls async_setup_entry once per configured lamp,
+which forwards setup to the light platform (light.py). The light platform
+builds the polling coordinator and stores it in hass.data[DOMAIN][entry_id];
+async_unload_entry reverses both steps.
+"""
 import logging
 
-from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+
 from .const import DOMAIN, PLATFORMS
 
 _LOGGER = logging.getLogger(__name__)
 
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up the dLight integration from a config entry.
-
-    This function is called by Home Assistant when a config entry is created
-    or during startup for existing entries. It stores the entry data in
-    `hass.data` and forwards the setup to the relevant platform (in this
-    case, the `light` platform).
-
-    Args:
-        hass: The Home Assistant instance.
-        entry: The config entry containing the user's configuration.
-
-    Returns:
-        True if the setup was successful, False otherwise.
-    """
-    # Store the config entry data (e.g., IP, device ID) in hass.data
-    # This assumes you use a Config Flow where entry.data holds the config
-    hass.data.setdefault(entry.domain, {})[entry.entry_id] = entry.data
-
-    _LOGGER.info("Setting up dLight entry with data: %s", entry.data)
-
-    # Forward the setup to the light platform.
+    """Set up a dLight lamp from a config entry."""
+    # Reserve our domain's slot; light.py fills it with this entry's coordinator.
+    hass.data.setdefault(DOMAIN, {})
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
     return True
 
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a dLight config entry.
-
-    This function is called by Home Assistant when a config entry is being
-    removed. It unloads the associated platforms and cleans up the stored
-    data from `hass.data`.
-
-    Args:
-        hass: The Home Assistant instance.
-        entry: The config entry to unload.
-
-    Returns:
-        True if the unload was successful, False otherwise.
-    """
-    # Forward the unloading to the platforms.
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-
-    # Clean up hass.data
-    if unload_ok:
-        hass.data[entry.domain].pop(entry.entry_id)
-        if not hass.data[entry.domain]:
-            hass.data.pop(entry.domain)
-
+    """Unload a dLight lamp and drop its coordinator."""
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+        if not hass.data[DOMAIN]:
+            hass.data.pop(DOMAIN)
     return unload_ok

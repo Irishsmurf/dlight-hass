@@ -160,7 +160,7 @@ async def test_light_coordinator_error(hass, mock_dlight_device, mock_config_ent
     assert hass.states.get("light.test_light").state == "on"
 
     # Mock a connection error during poll for both state and info
-    from custom_components.dlight.light import DLightConnectionError
+    from dlightclient import DLightConnectionError
     mock_dlight_device.get_state.side_effect = DLightConnectionError("Connection failed")
     mock_dlight_device.get_info.side_effect = DLightConnectionError("Connection failed")
 

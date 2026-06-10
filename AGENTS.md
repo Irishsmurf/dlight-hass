@@ -33,5 +33,5 @@
 - Tests patch `DLightDevice` / `AsyncDLightClient` at the package root (`custom_components.dlight.*`), where they are instantiated; the coordinator is read from `entry.runtime_data`.
 - New UI strings go into `strings.json` **and** every file in `translations/`.
 - High test coverage expected for PRs; verify with `pytest` before committing.
-- Bump `manifest.json` version for every release; tag releases as `vX.Y.Z`.
+- **Releases are automated**: bump `manifest.json`, commit, push a `vX.Y.Z` tag. The Release workflow verifies the tag matches the manifest version, runs pytest, builds a slim `dlight.zip` (excludes `brand/`), and publishes the GitHub release with generated notes. Tags with a suffix (`v1.4.0-rc1`) publish as prereleases. HACS installs the zip asset (`zip_release` in `hacs.json`), so every release MUST carry one.
 - `custom_components/dlight/brand/` holds logo/icon assets. **Do not move them**: the HACS Action's brands check requires them at exactly this path (until the domain is submitted to `home-assistant/brands`).

@@ -74,6 +74,7 @@ If a lamp's IP address changes, use **Reconfigure** from the same menu — or si
 
 - Run the test suite with `pytest` (see `AGENTS.md` for architecture notes).
 - `custom_components/dlight/brand/` holds the logo assets required by the HACS brands validation; the long-term home for these is a [home-assistant/brands](https://github.com/home-assistant/brands) submission.
+- **Releasing:** bump the version in `manifest.json`, commit, and push a matching `vX.Y.Z` tag — the Release workflow runs the tests, builds `dlight.zip` (what HACS installs), and publishes the GitHub release automatically.
 
 **Disclaimer:**
 - Use at your own risk. This is a personal project and carries no official support.

@@ -73,7 +73,7 @@ If a lamp's IP address changes, use **Reconfigure** from the same menu — or si
 ## Development
 
 - Run the test suite with `pytest` (see `AGENTS.md` for architecture notes).
-- The `brand/` directory holds logo assets staged for a future [home-assistant/brands](https://github.com/home-assistant/brands) submission; Home Assistant does not read them from this repository.
+- `custom_components/dlight/brand/` holds the logo assets required by the HACS brands validation; the long-term home for these is a [home-assistant/brands](https://github.com/home-assistant/brands) submission.
 
 **Disclaimer:**
 - Use at your own risk. This is a personal project and carries no official support.

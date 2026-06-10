@@ -34,4 +34,4 @@
 - New UI strings go into `strings.json` **and** every file in `translations/`.
 - High test coverage expected for PRs; verify with `pytest` before committing.
 - Bump `manifest.json` version for every release; tag releases as `vX.Y.Z`.
-- `brand/` (repo root) holds logo/icon assets staged for a future `home-assistant/brands` submission — they are not read by HA or HACS from this repo.
+- `custom_components/dlight/brand/` holds logo/icon assets. **Do not move them**: the HACS Action's brands check requires them at exactly this path (until the domain is submitted to `home-assistant/brands`).

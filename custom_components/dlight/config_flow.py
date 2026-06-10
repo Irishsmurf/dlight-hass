@@ -30,10 +30,17 @@ from dlightclient import (
 
 from homeassistant import config_entries, exceptions
 from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import CONF_DEVICE_ID, DOMAIN
+from .const import (
+    CONF_DEVICE_ID,
+    CONF_POLL_INTERVAL,
+    DEFAULT_POLL_INTERVAL,
+    DOMAIN,
+    MAX_POLL_INTERVAL,
+    MIN_POLL_INTERVAL,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -93,6 +100,14 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the flow with an empty discovery cache."""
         self._discovered: dict[str, dict[str, Any]] = {}
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> "DLightOptionsFlow":
+        """Expose the per-entry options flow (poll interval tuning)."""
+        return DLightOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -228,6 +243,38 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 STEP_USER_DATA_SCHEMA, user_input or entry.data
             ),
             errors=errors,
+        )
+
+
+class DLightOptionsFlow(config_entries.OptionsFlow):
+    """Per-entry options: currently just the polling interval.
+
+    Saving triggers the update listener registered in __init__.py, which
+    reloads the entry so the coordinator is rebuilt with the new interval.
+    """
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Show and handle the single options form."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_POLL_INTERVAL,
+                        default=self.config_entry.options.get(
+                            CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL
+                        ),
+                    ): vol.All(
+                        vol.Coerce(int),
+                        vol.Range(min=MIN_POLL_INTERVAL, max=MAX_POLL_INTERVAL),
+                    ),
+                }
+            ),
         )
 
 

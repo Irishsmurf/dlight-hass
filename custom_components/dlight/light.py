@@ -1,11 +1,11 @@
 """Light platform for dLight.
 
-Architecture in one paragraph: a DLightCoordinator reads the lamp's static
-identity (model, firmware) once at setup, then polls only its state every
-UPDATE_INTERVAL. DLightEntity is a thin read-only view over that cache, with
-one twist — *optimistic* state. Commands (turn on, set brightness, ...)
-update the entity's state immediately so the UI feels instant; the next
-confirmed poll replaces the guess with the device's reported truth.
+The heavy lifting (device handle, polling) happens in __init__.py and
+coordinator.py; this module only defines the entity. DLightEntity is a thin
+read-only view over the coordinator's cache, with one twist — *optimistic*
+state. Commands (turn on, set brightness, ...) update the entity's state
+immediately so the UI feels instant; the next confirmed poll replaces the
+guess with the device's reported truth.
 """
 from __future__ import annotations
 
@@ -14,12 +14,7 @@ import logging
 import math
 from typing import Any
 
-from dlightclient import (
-    STATUS_SUCCESS,
-    AsyncDLightClient,
-    DLightDevice,
-    DLightError,
-)
+from dlightclient import DLightDevice
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
@@ -28,24 +23,13 @@ from homeassistant.components.light import (
     LightEntity,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_IP_ADDRESS
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-    UpdateFailed,
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import (
-    CONF_DEVICE_ID,
-    DOMAIN,
-    KELVIN_MAX,
-    KELVIN_MIN,
-    POLL_TIMEOUT,
-    UPDATE_INTERVAL,
-)
+from .const import DOMAIN, KELVIN_MAX, KELVIN_MIN
+from .coordinator import DLightCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,104 +54,16 @@ def _to_dlight_brightness(brightness: int) -> int:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: ConfigEntry[DLightCoordinator],
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Wire up one lamp: build the device handle, prime the coordinator, add the entity."""
-    ip_address = entry.data.get(CONF_IP_ADDRESS)
-    device_id = entry.data.get(CONF_DEVICE_ID)
-    if not ip_address or not device_id:
-        _LOGGER.error(
-            "Config entry %s is missing IP address or device ID", entry.entry_id
-        )
-        return
+    """Add the light entity for an already-initialized lamp.
 
-    device = DLightDevice(
-        ip_address=ip_address, device_id=device_id, client=AsyncDLightClient()
-    )
-    name = entry.title or f"dLight {device_id}"
-    _LOGGER.debug("Setting up dLight device: %s", device)
-
-    coordinator = DLightCoordinator(hass, device, name)
-    # Fetch once before adding the entity, so it never appears with unknown
-    # state; raises ConfigEntryNotReady (auto-retry) if the lamp is offline.
-    await coordinator.async_config_entry_first_refresh()
-
-    # Published for other platforms and the test suite.
-    hass.data[DOMAIN][entry.entry_id] = coordinator
-
-    async_add_entities([DLightEntity(coordinator, device, entry)])
-
-
-class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Owns all communication with one lamp.
-
-    Two payloads, two cadences:
-      * get_info  -> model / firmware / hardware versions. These never change
-        between polls, so they are fetched ONCE (in _async_setup) and cached
-        in `self.info` for the device registry card.
-      * get_state -> {"on": bool, "brightness": 0-100, "color": {"temperature": K}}.
-        This is the actual poll target, every UPDATE_INTERVAL.
+    __init__.async_setup_entry built the coordinator and stored it in
+    entry.runtime_data before forwarding here; nothing is created twice.
     """
-
-    def __init__(self, hass: HomeAssistant, device: DLightDevice, name: str) -> None:
-        """Initialize the coordinator for a single device."""
-        super().__init__(
-            hass,
-            _LOGGER,
-            name=f"{name} state coordinator",
-            update_interval=UPDATE_INTERVAL,
-        )
-        self.device = device
-        # Static identity, filled once by _async_setup before the first poll.
-        self.info: dict[str, Any] = {}
-
-    async def _async_setup(self) -> None:
-        """Fetch the lamp's static info once, before the first state poll.
-
-        Failure is tolerated: the info payload is cosmetic (device registry
-        card), and a lamp that can't answer get_info may still control fine.
-        """
-        try:
-            async with asyncio.timeout(POLL_TIMEOUT):
-                info = await self.device.get_info()
-        except (TimeoutError, DLightError) as err:
-            _LOGGER.warning(
-                "Could not read device info for %s (will show generic card): %s",
-                self.device.id,
-                err,
-            )
-            return
-
-        if isinstance(info, dict) and info.get("status") == STATUS_SUCCESS:
-            # Only the fields the device registry cares about.
-            self.info = {
-                key: info.get(key) for key in ("swVersion", "hwVersion", "deviceModel")
-            }
-        else:
-            _LOGGER.warning(
-                "Device info query for %s returned no usable data: %s",
-                self.device.id,
-                info,
-            )
-
-    async def _async_update_data(self) -> dict[str, Any]:
-        """Poll the lamp's current state; any failure marks it unavailable."""
-        try:
-            async with asyncio.timeout(POLL_TIMEOUT):
-                state = await self.device.get_state()
-        except TimeoutError as err:
-            raise UpdateFailed(f"Timeout polling dLight {self.device.id}") from err
-        except DLightError as err:
-            raise UpdateFailed(
-                f"Error polling dLight {self.device.id}: {err}"
-            ) from err
-
-        if not isinstance(state, dict):
-            raise UpdateFailed(
-                f"Invalid state payload from dLight {self.device.id}: {state!r}"
-            )
-        return state
+    coordinator = entry.runtime_data
+    async_add_entities([DLightEntity(coordinator, coordinator.device, entry)])
 
 
 class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
@@ -249,7 +145,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
         The lamp has no single "apply this state" command, so the needed
         commands are issued concurrently, then the result is assumed
-        optimistically rather than waiting up to UPDATE_INTERVAL for a poll.
+        optimistically rather than waiting up to a full poll interval.
         """
         brightness: int | None = kwargs.get(ATTR_BRIGHTNESS)
         kelvin: int | None = kwargs.get(ATTR_COLOR_TEMP_KELVIN)

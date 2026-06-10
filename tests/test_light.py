@@ -4,12 +4,12 @@ from homeassistant.components.light import DOMAIN as LIGHT_DOMAIN
 from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.dlight.const import DOMAIN, UPDATE_INTERVAL, CONF_DEVICE_ID
+from custom_components.dlight.const import DOMAIN, CONF_DEVICE_ID
 
 @pytest.fixture
 def mock_dlight_device():
-    """Mock a dLight device."""
-    with patch("custom_components.dlight.light.DLightDevice", autospec=True) as mock_device_class:
+    """Mock a dLight device (patched where it is created: the package root)."""
+    with patch("custom_components.dlight.DLightDevice", autospec=True) as mock_device_class:
         mock_device = mock_device_class.return_value
         mock_device.id = "test_device_id"
         mock_device.ip = "127.0.0.1"
@@ -49,7 +49,7 @@ async def test_light_setup(hass, mock_dlight_device, mock_config_entry):
     mock_config_entry.add_to_hass(hass)
 
     # Setup the integration
-    with patch("custom_components.dlight.light.AsyncDLightClient", autospec=True):
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
@@ -65,7 +65,7 @@ async def test_light_turn_on(hass, mock_dlight_device, mock_config_entry):
     """Test turning on the dLight light."""
     mock_config_entry.add_to_hass(hass)
 
-    with patch("custom_components.dlight.light.AsyncDLightClient", autospec=True):
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
         await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
@@ -94,7 +94,7 @@ async def test_light_turn_off(hass, mock_dlight_device, mock_config_entry):
     """Test turning off the dLight light."""
     mock_config_entry.add_to_hass(hass)
 
-    with patch("custom_components.dlight.light.AsyncDLightClient", autospec=True):
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
         await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
@@ -120,12 +120,12 @@ async def test_light_poll_update(hass, mock_dlight_device, mock_config_entry):
     """Test that the entity updates its state after a poll."""
     mock_config_entry.add_to_hass(hass)
 
-    with patch("custom_components.dlight.light.AsyncDLightClient", autospec=True):
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
         await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
-    # Get the coordinator
-    coordinator = hass.data[DOMAIN][mock_config_entry.entry_id]
+    # Get the coordinator from the entry's typed runtime data
+    coordinator = mock_config_entry.runtime_data
 
     # Verify initial state
     state = hass.states.get("light.test_light")
@@ -149,12 +149,12 @@ async def test_light_coordinator_error(hass, mock_dlight_device, mock_config_ent
     """Test that the entity becomes unavailable when polling fails."""
     mock_config_entry.add_to_hass(hass)
 
-    with patch("custom_components.dlight.light.AsyncDLightClient", autospec=True):
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
         await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
-    # Get the coordinator
-    coordinator = hass.data[DOMAIN][mock_config_entry.entry_id]
+    # Get the coordinator from the entry's typed runtime data
+    coordinator = mock_config_entry.runtime_data
 
     # Verify initial availability
     assert hass.states.get("light.test_light").state == "on"
@@ -182,7 +182,7 @@ async def test_light_setup_with_info_failure(hass, mock_dlight_device, mock_conf
     mock_dlight_device.get_info.side_effect = DLightConnectionError("info offline")
     mock_config_entry.add_to_hass(hass)
 
-    with patch("custom_components.dlight.light.AsyncDLightClient", autospec=True):
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
@@ -195,7 +195,7 @@ async def test_light_turn_on_no_args(hass, mock_dlight_device, mock_config_entry
     """Test turning on the light without any extra arguments."""
     mock_config_entry.add_to_hass(hass)
 
-    with patch("custom_components.dlight.light.AsyncDLightClient", autospec=True):
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
         await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 

@@ -6,12 +6,18 @@ read-only view over the coordinator's cache, with one twist — *optimistic*
 state. Commands (turn on, set brightness, ...) update the entity's state
 immediately so the UI feels instant; the next confirmed poll replaces the
 guess with the device's reported truth.
+
+Transitions: the lamp protocol has no native fade, so `transition:` is
+emulated — a background task walks brightness/temperature toward the target
+in small steps. The task is cancelled by any newer command, so the latest
+request always wins.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 import math
+from contextlib import suppress
 from typing import Any
 
 from dlightclient import DLightDevice
@@ -19,12 +25,14 @@ from dlightclient import DLightDevice
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_COLOR_TEMP_KELVIN,
+    ATTR_TRANSITION,
     ColorMode,
     LightEntity,
+    LightEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -39,6 +47,15 @@ _LOGGER = logging.getLogger(__name__)
 # overlapping commands at a single-socket device. Coordinator polling is
 # unaffected — this only gates entity commands (turn_on/turn_off).
 PARALLEL_UPDATES = 1
+
+# Emulated transition pacing. ~2 commands/sec is comfortable for the lamp's
+# single TCP socket; the step cap keeps very long transitions from turning
+# into command floods (the interval stretches instead).
+TRANSITION_STEP_INTERVAL = 0.5
+TRANSITION_MAX_STEPS = 60
+# Fade-to-off bottoms out here before the actual power-off command: 0% via
+# set_brightness is indistinguishable from "off" and would end the fade early.
+TRANSITION_MIN_OFF_PCT = 1
 
 
 def _to_ha_brightness(percent: int) -> int:
@@ -57,6 +74,42 @@ def _to_dlight_brightness(brightness: int) -> int:
     so only an explicit 0 ever lands on 0.
     """
     return max(0, min(100, math.ceil(brightness / 255 * 100)))
+
+
+def _interpolate_steps(
+    start_pct: int | None,
+    end_pct: int | None,
+    start_kelvin: int | None,
+    end_kelvin: int | None,
+    count: int,
+) -> list[tuple[int | None, int | None]]:
+    """Build per-step (brightness%, kelvin) values for an emulated fade.
+
+    Each tuple holds only what *changed* since the previous step (None means
+    "skip this command"), so a slow 10-minute fade doesn't resend identical
+    values every half second. An unknown start (None) sends the end value
+    once on the first step and dedupes the rest. The final step always lands
+    exactly on the requested target.
+    """
+    steps: list[tuple[int | None, int | None]] = []
+    last_pct = start_pct
+    last_kelvin = start_kelvin
+    for i in range(1, count + 1):
+        fraction = i / count
+        pct: int | None = None
+        if end_pct is not None:
+            base = start_pct if start_pct is not None else end_pct
+            value = round(base + (end_pct - base) * fraction)
+            if value != last_pct:
+                pct = last_pct = value
+        kelvin: int | None = None
+        if end_kelvin is not None:
+            base = start_kelvin if start_kelvin is not None else end_kelvin
+            value = round(base + (end_kelvin - base) * fraction)
+            if value != last_kelvin:
+                kelvin = last_kelvin = value
+        steps.append((pct, kelvin))
+    return steps
 
 
 async def async_setup_entry(
@@ -84,11 +137,11 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
     _attr_has_entity_name = True  # entity is named after its device...
     _attr_name = None  # ...with no suffix: it IS the device's main feature
-    _attr_assumed_state = True  # we guess between polls; HA shows toggle-style UI
     _attr_supported_color_modes = {ColorMode.COLOR_TEMP}
     _attr_color_mode = ColorMode.COLOR_TEMP
     _attr_min_color_temp_kelvin = KELVIN_MIN
     _attr_max_color_temp_kelvin = KELVIN_MAX
+    _attr_supported_features = LightEntityFeature.TRANSITION
 
     def __init__(
         self,
@@ -107,6 +160,10 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         self._optimistic_on: bool | None = None
         self._optimistic_brightness: int | None = None  # HA scale, 0-255
         self._optimistic_kelvin: int | None = None
+
+        # The currently running emulated fade, if any. At most one exists;
+        # every new command cancels it before doing anything else.
+        self._transition_task: asyncio.Task | None = None
 
         # The registry card is built once: coordinator.info is static
         # (fetched a single time at setup, see DLightCoordinator).
@@ -148,6 +205,17 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         color = (self.coordinator.data or {}).get("color")
         return color.get("temperature") if isinstance(color, dict) else None
 
+    def _current_pct(self) -> int | None:
+        """Current brightness in *device* percent, for fade starting points.
+
+        Prefers the device-native value from the coordinator: deriving it
+        from self.brightness would round-trip 0-100 -> 0-255 -> 0-100 and
+        skew the scale (50 -> 128 -> 51).
+        """
+        if self._optimistic_brightness is not None:
+            return _to_dlight_brightness(self._optimistic_brightness)
+        return (self.coordinator.data or {}).get("brightness")
+
     # --- Commands ---
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -156,13 +224,27 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         The lamp has no single "apply this state" command, so the needed
         commands are issued concurrently, then the result is assumed
         optimistically rather than waiting up to a full poll interval.
+
+        With `transition:` the change is emulated by a background fade task
+        instead; the service call returns once the fade is scheduled.
         """
         brightness: int | None = kwargs.get(ATTR_BRIGHTNESS)
         kelvin: int | None = kwargs.get(ATTR_COLOR_TEMP_KELVIN)
+        transition: float | None = kwargs.get(ATTR_TRANSITION)
 
         # HA convention: turn_on with brightness 0 actually means "turn off".
         if brightness is not None and _to_dlight_brightness(brightness) == 0:
-            await self.async_turn_off()
+            await self.async_turn_off(**kwargs)
+            return
+
+        # The newest command always wins over a fade already in flight.
+        await self._async_cancel_transition()
+
+        if (
+            transition is not None
+            and transition > 0
+            and self._async_start_turn_on_fade(brightness, kelvin, transition)
+        ):
             return
 
         commands = []
@@ -182,7 +264,9 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             _LOGGER.exception("Failed to turn on dLight %s", self.device.id)
             self._clear_optimistic_state()
             self.async_write_ha_state()
-            raise ServiceValidationError(
+            # HomeAssistantError, not ServiceValidationError: the user's input
+            # was fine — the device couldn't be reached or rejected the command.
+            raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="turn_on_failed",
                 translation_placeholders={
@@ -210,14 +294,30 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the light off (optimistically, confirmed by the next poll)."""
+        """Turn the light off (optimistically, confirmed by the next poll).
+
+        With `transition:` brightness fades down first, then the power-off
+        command is sent by the same background task.
+        """
+        transition: float | None = kwargs.get(ATTR_TRANSITION)
+
+        await self._async_cancel_transition()
+
+        if (
+            transition is not None
+            and transition > 0
+            and self._async_start_turn_off_fade(transition)
+        ):
+            return
+
         try:
-            await self.device.turn_off()
+            async with self.coordinator.command_lock:
+                await self.device.turn_off()
         except Exception as err:
             _LOGGER.exception("Failed to turn off dLight %s", self.device.id)
             self._clear_optimistic_state()
             self.async_write_ha_state()
-            raise ServiceValidationError(
+            raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="turn_off_failed",
                 translation_placeholders={
@@ -239,11 +339,161 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
         gather(return_exceptions=True) lets every command finish before we
         judge the batch — a plain gather would abandon in-flight siblings.
+        The coordinator's command_lock keeps the batch from interleaving with
+        fade steps or the identify button's flash sequence.
         """
-        results = await asyncio.gather(*commands, return_exceptions=True)
+        async with self.coordinator.command_lock:
+            results = await asyncio.gather(*commands, return_exceptions=True)
         for result in results:
             if isinstance(result, Exception):
                 raise result
+
+    # --- Emulated transitions ---
+
+    @callback
+    def _async_start_turn_on_fade(
+        self, brightness: int | None, kelvin: int | None, transition: float
+    ) -> bool:
+        """Schedule a fade toward the requested turn_on target.
+
+        Returns False when fading is impossible (the lamp's current state is
+        unknown, or nothing would actually change) so the caller falls back
+        to the instant path.
+        """
+        is_on = self.is_on
+        if is_on is None:
+            return False  # no starting point to fade from
+
+        current_pct = self._current_pct()
+
+        if brightness is not None:
+            end_pct = _to_dlight_brightness(brightness)
+        elif not is_on:
+            # Bare turn_on from off: fade in to the last known level.
+            end_pct = current_pct or 100
+        else:
+            end_pct = None  # already on, brightness untouched
+        start_pct = current_pct if is_on else 0
+
+        end_kelvin = int(kelvin) if kelvin is not None else None
+        start_kelvin = self.color_temp_kelvin
+
+        if (end_pct is None or end_pct == start_pct) and (
+            end_kelvin is None or end_kelvin == start_kelvin
+        ):
+            return False  # nothing to fade
+
+        steps, interval = self._fade_plan(
+            start_pct, end_pct, start_kelvin, end_kelvin, transition
+        )
+        self._transition_task = self.hass.async_create_task(
+            self._async_run_fade(steps, interval, turn_off_after=False)
+        )
+        return True
+
+    @callback
+    def _async_start_turn_off_fade(self, transition: float) -> bool:
+        """Schedule a fade down to minimum brightness followed by power-off.
+
+        Returns False when there is nothing to fade (lamp off/unknown, or
+        already at minimum) so the caller sends a plain power-off instead.
+        """
+        start_pct = self._current_pct()
+        if not self.is_on or start_pct is None or start_pct <= TRANSITION_MIN_OFF_PCT:
+            return False
+
+        steps, interval = self._fade_plan(
+            start_pct, TRANSITION_MIN_OFF_PCT, None, None, transition
+        )
+        self._transition_task = self.hass.async_create_task(
+            self._async_run_fade(steps, interval, turn_off_after=True)
+        )
+        return True
+
+    def _fade_plan(
+        self,
+        start_pct: int | None,
+        end_pct: int | None,
+        start_kelvin: int | None,
+        end_kelvin: int | None,
+        transition: float,
+    ) -> tuple[list[tuple[int | None, int | None]], float]:
+        """Slice a transition into timed steps of interpolated values."""
+        count = max(1, min(round(transition / TRANSITION_STEP_INTERVAL), TRANSITION_MAX_STEPS))
+        interval = transition / count
+        steps = _interpolate_steps(start_pct, end_pct, start_kelvin, end_kelvin, count)
+        return steps, interval
+
+    async def _async_run_fade(
+        self,
+        steps: list[tuple[int | None, int | None]],
+        interval: float,
+        *,
+        turn_off_after: bool,
+    ) -> None:
+        """Walk the lamp through the fade steps; runs as a background task.
+
+        Each step updates the optimistic state so the UI animates along.
+        Device errors end the fade with a log entry rather than an exception:
+        there is no service call left to deliver it to. A refresh afterwards
+        reconciles whatever the lamp actually reached.
+        """
+        try:
+            for index, (pct, kelvin) in enumerate(steps):
+                if index:
+                    await asyncio.sleep(interval)
+                commands = []
+                if pct is not None:
+                    commands.append(self.device.set_brightness(pct))
+                if kelvin is not None:
+                    commands.append(self.device.set_color_temperature(kelvin))
+                if not commands:
+                    continue  # deduplicated step: keep the timing, skip the I/O
+                async with self.coordinator.command_lock:
+                    await asyncio.gather(*commands)
+                self._optimistic_on = True
+                if pct is not None:
+                    self._optimistic_brightness = _to_ha_brightness(pct)
+                if kelvin is not None:
+                    self._optimistic_kelvin = kelvin
+                self.async_write_ha_state()
+
+            if turn_off_after:
+                async with self.coordinator.command_lock:
+                    await self.device.turn_off()
+                self._optimistic_on = False
+                self._optimistic_brightness = None
+                self._optimistic_kelvin = None
+                self.async_write_ha_state()
+        except asyncio.CancelledError:
+            raise  # a newer command took over; it owns the state from here
+        except Exception:  # noqa: BLE001 — background task: log, don't crash HA
+            _LOGGER.warning(
+                "Transition failed for dLight %s; falling back to polled state",
+                self.device.id,
+                exc_info=True,
+            )
+            self._clear_optimistic_state()
+            self.async_write_ha_state()
+
+        # Drop the task reference *before* the refresh: _handle_coordinator_update
+        # ignores polls while a fade is "active", and this fade is done — its
+        # closing refresh must be allowed through to reconcile state.
+        self._transition_task = None
+        await self.coordinator.async_request_refresh()
+
+    async def _async_cancel_transition(self) -> None:
+        """Stop any in-flight fade and wait for it to fully unwind."""
+        if self._transition_task is not None and not self._transition_task.done():
+            self._transition_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._transition_task
+        self._transition_task = None
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Entity is going away: never leave a fade task running behind it."""
+        await self._async_cancel_transition()
+        await super().async_will_remove_from_hass()
 
     # --- Coordinator plumbing ---
 
@@ -259,5 +509,10 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         """A confirmed poll arrived: real data replaces any optimistic guess."""
         if self.coordinator.data is None:
             return  # failed poll; availability handling is CoordinatorEntity's job
+        if self._transition_task is not None and not self._transition_task.done():
+            # Mid-fade a poll is already stale: it would snap the UI back to
+            # wherever the lamp was when polled. The fade requests its own
+            # refresh on completion.
+            return
         self._clear_optimistic_state()
         super()._handle_coordinator_update()

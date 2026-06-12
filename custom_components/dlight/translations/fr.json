@@ -41,7 +41,8 @@
         "abort": {
             "already_configured": "Cette lampe est déjà configurée. Son adresse IP enregistrée a été actualisée.",
             "reconfigure_successful": "La reconfiguration a réussi.",
-            "unique_id_mismatch": "Cet identifiant appartient à une autre lampe. La reconfiguration ne peut mettre à jour que la lampe de cette entrée."
+            "unique_id_mismatch": "Cet identifiant appartient à une autre lampe. La reconfiguration ne peut mettre à jour que la lampe de cette entrée.",
+            "unknown_device": "Cet appareil réseau ne correspond à aucune lampe dLight configurée."
         }
     },
     "exceptions": {
@@ -50,6 +51,9 @@
         },
         "turn_off_failed": {
             "message": "Échec de l'extinction de {device_name}. L'appareil a signalé : {error}"
+        },
+        "identify_failed": {
+            "message": "Échec de l'identification de {device_name}. L'appareil a signalé : {error}"
         }
     }
 }

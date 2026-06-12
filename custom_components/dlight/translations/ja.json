@@ -41,7 +41,8 @@
         "abort": {
             "already_configured": "このランプはすでに設定されています。保存されているIPアドレスを更新しました。",
             "reconfigure_successful": "再設定が完了しました。",
-            "unique_id_mismatch": "このデバイスIDは別のランプのものです。再設定では、このエントリのランプのみ更新できます。"
+            "unique_id_mismatch": "このデバイスIDは別のランプのものです。再設定では、このエントリのランプのみ更新できます。",
+            "unknown_device": "このネットワークデバイスは、設定済みのdLightランプと一致しません。"
         }
     },
     "exceptions": {
@@ -50,6 +51,9 @@
         },
         "turn_off_failed": {
             "message": "{device_name} のオフに失敗しました。デバイスの報告: {error}"
+        },
+        "identify_failed": {
+            "message": "{device_name} の識別に失敗しました。デバイスの報告: {error}"
         }
     }
 }

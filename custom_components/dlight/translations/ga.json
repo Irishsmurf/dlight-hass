@@ -41,7 +41,8 @@
         "abort": {
             "already_configured": "Tá an lampa seo cumraithe cheana féin. Athnuadh an seoladh IP atá stóráilte.",
             "reconfigure_successful": "D'éirigh leis an athchumrú.",
-            "unique_id_mismatch": "Baineann an t-aitheantas gléis sin le lampa eile. Ní féidir leis an athchumrú ach lampa na hiontrála seo a nuashonrú."
+            "unique_id_mismatch": "Baineann an t-aitheantas gléis sin le lampa eile. Ní féidir leis an athchumrú ach lampa na hiontrála seo a nuashonrú.",
+            "unknown_device": "Ní mheaitseálann an gléas líonra seo aon lampa dLight atá cumraithe."
         }
     },
     "exceptions": {
@@ -50,6 +51,9 @@
         },
         "turn_off_failed": {
             "message": "Theip ar mhúchadh {device_name}. Thuairiscigh an gléas: {error}"
+        },
+        "identify_failed": {
+            "message": "Theip ar {device_name} a aithint. Thuairiscigh an gléas: {error}"
         }
     }
 }

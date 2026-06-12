@@ -41,7 +41,8 @@
         "abort": {
             "already_configured": "Diese Lampe ist bereits konfiguriert. Die gespeicherte IP-Adresse wurde aktualisiert.",
             "reconfigure_successful": "Die Neukonfiguration war erfolgreich.",
-            "unique_id_mismatch": "Diese Geräte-ID gehört zu einer anderen Lampe. Bei der Neukonfiguration kann nur die Lampe dieses Eintrags aktualisiert werden."
+            "unique_id_mismatch": "Diese Geräte-ID gehört zu einer anderen Lampe. Bei der Neukonfiguration kann nur die Lampe dieses Eintrags aktualisiert werden.",
+            "unknown_device": "Dieses Netzwerkgerät entspricht keiner konfigurierten dLight-Lampe."
         }
     },
     "exceptions": {
@@ -50,6 +51,9 @@
         },
         "turn_off_failed": {
             "message": "Fehler beim Ausschalten von {device_name}. Das Gerät meldete: {error}"
+        },
+        "identify_failed": {
+            "message": "Fehler beim Identifizieren von {device_name}. Das Gerät meldete: {error}"
         }
     }
 }

@@ -14,11 +14,13 @@
 | Module (`custom_components/dlight/`) | Responsibility |
 |---|---|
 | `__init__.py` | Composition root: builds `DLightDevice` with a **persistent** `AsyncDLightClient`. Registers `client.close` on entry unload. Primes the first refresh and publishes the coordinator via `entry.runtime_data`. |
-| `coordinator.py` | `DLightCoordinator`: fetches static device info **once**; polls `get_state(force_update=True)` on interval. Failure ⇒ entity unavailable. |
-| `light.py` | `DLightEntity`: optimistic state view. Service calls (`turn_on`/`turn_off`) raise `HomeAssistantError` on failure for UI feedback. `PARALLEL_UPDATES = 1` serializes commands per lamp. |
-| `config_flow.py` | UDP discovery → pick list, manual entry, reconfigure step, and options flow (poll interval 5–600s). Known lamps rediscovered on a new IP are **self-healed** (entry updated + reloaded); manual re-add of a known lamp also refreshes its IP. |
+| `coordinator.py` | `DLightCoordinator`: fetches static device info **once**; polls `get_state(force_update=True)` on interval. Failure ⇒ entity unavailable. After repeated consecutive failures, fires a one-shot UDP rediscovery sweep and self-heals the entry's IP if the lamp answers from a new address. Owns `command_lock`. |
+| `light.py` | `DLightEntity`: optimistic state view. Service calls (`turn_on`/`turn_off`) raise `HomeAssistantError` on failure for UI feedback. `transition:` is **emulated** by a cancellable background fade task (no native fade in the protocol). `PARALLEL_UPDATES = 1` serializes service calls; cross-platform command serialization uses `coordinator.command_lock`. |
+| `button.py` | Identify button (`ButtonDeviceClass.IDENTIFY`, diagnostic category) — runs `device.flash()` under `coordinator.command_lock`. |
+| `binary_sensor.py` | Connectivity diagnostic sensor mirroring `coordinator.last_update_success` (always `available`, so it reports *offline* instead of going unavailable). |
+| `config_flow.py` | UDP discovery → pick list, manual entry, reconfigure step, and a `dhcp` step (manifest matches `registered_devices`) that self-heals a known lamp's IP when DHCP hands it a new one. There is **no options flow** (removed per ADR-0010; poll interval is fixed). Known lamps rediscovered on a new IP during a user-initiated scan are also self-healed; manual re-add of a known lamp refreshes its IP too. |
 | `diagnostics.py` | Redacted snapshot (IP and device ID scrubbed) of entry data, options, device info, and last state. |
-| `const.py` | Domain, config/option keys, poll-interval bounds, Kelvin range (2600–6000K), poll timeout. |
+| `const.py` | Domain, config keys, Kelvin range (2600–6000K), poll interval/timeout, rediscovery backoff. |
 | `translations/` | `en`, `de`, `fr`, `ja`, `ga` — keep key parity with `strings.json` when adding UI text. |
 
 ## Commands

@@ -11,12 +11,19 @@ import logging
 from datetime import timedelta
 from typing import Any
 
-from dlightclient import STATUS_SUCCESS, DLightDevice, DLightError
+from dlightclient import STATUS_SUCCESS, DLightDevice, DLightError, discover_devices
 
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_IP_ADDRESS
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import POLL_INTERVAL, POLL_TIMEOUT
+from .const import (
+    POLL_INTERVAL,
+    POLL_TIMEOUT,
+    REDISCOVERY_DURATION,
+    REDISCOVERY_FAILURE_THRESHOLD,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,6 +42,7 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def __init__(
         self,
         hass: HomeAssistant,
+        entry: ConfigEntry,
         device: DLightDevice,
         name: str,
     ) -> None:
@@ -42,12 +50,22 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=f"{name} state coordinator",
             update_interval=timedelta(seconds=POLL_INTERVAL),
         )
         self.device = device
         # Static identity, filled once by _async_setup before the first poll.
         self.info: dict[str, Any] = {}
+        # Serializes device *commands* across platforms (light commands,
+        # transition fade steps, the identify button's flash sequence): the
+        # lamp speaks over a single TCP socket, and PARALLEL_UPDATES only
+        # serializes service calls within one platform.
+        self.command_lock = asyncio.Lock()
+        # Rediscovery bookkeeping: count failed polls in a row, and keep at
+        # most one UDP sweep in flight at a time.
+        self._consecutive_failures = 0
+        self._rediscovery_task: asyncio.Task | None = None
 
     async def _async_setup(self) -> None:
         """Fetch the lamp's static info once, before the first state poll.
@@ -90,14 +108,76 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # polling — and a dead lamp would never raise here.
                 state = await self.device.get_state(force_update=True)
         except TimeoutError as err:
+            self._note_poll_failure()
             raise UpdateFailed(f"Timeout polling dLight {self.device.id}") from err
         except DLightError as err:
+            self._note_poll_failure()
             raise UpdateFailed(
                 f"Error polling dLight {self.device.id}: {err}"
             ) from err
 
         if not isinstance(state, dict):
+            self._note_poll_failure()
             raise UpdateFailed(
                 f"Invalid state payload from dLight {self.device.id}: {state!r}"
             )
+        self._consecutive_failures = 0
         return state
+
+    def _note_poll_failure(self) -> None:
+        """Count a failed poll; every Nth consecutive failure tries rediscovery.
+
+        The modulo (rather than ==) keeps retrying for as long as the lamp
+        stays unreachable — a lamp that changes IP *while* already offline
+        would otherwise be missed by a single one-shot sweep.
+        """
+        self._consecutive_failures += 1
+        if self._consecutive_failures % REDISCOVERY_FAILURE_THRESHOLD:
+            return
+        if self._rediscovery_task is not None and not self._rediscovery_task.done():
+            return
+        # Tracked (not background) task: it is short-lived, and HA then waits
+        # for it on shutdown instead of abandoning a half-done entry update.
+        self._rediscovery_task = self.hass.async_create_task(
+            self._async_attempt_rediscovery(),
+            name=f"dlight-{self.device.id}-rediscovery",
+        )
+
+    async def _async_attempt_rediscovery(self) -> None:
+        """Sweep the LAN for this lamp and self-heal the entry's stored IP.
+
+        Complements HA's DHCP watcher (manifest `dhcp` matcher): this path
+        also works when the lease renewal isn't visible to HA. Finding the
+        lamp on a new address updates the config entry and schedules a
+        reload, which rebuilds the device handle against the new IP.
+        """
+        _LOGGER.debug(
+            "dLight %s unreachable for %d polls; trying UDP rediscovery",
+            self.device.id,
+            self._consecutive_failures,
+        )
+        try:
+            devices = await discover_devices(discovery_duration=REDISCOVERY_DURATION)
+        except Exception:  # noqa: BLE001 — best-effort recovery, never raise
+            _LOGGER.debug("dLight rediscovery sweep failed", exc_info=True)
+            return
+
+        for found in devices:
+            if found.get("deviceId") != self.device.id:
+                continue
+            new_ip = found.get("ip_address")
+            if new_ip and new_ip != self.device.ip:
+                _LOGGER.info(
+                    "dLight %s found at new address %s (was %s); updating entry",
+                    self.device.id,
+                    new_ip,
+                    self.device.ip,
+                )
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    data={**self.config_entry.data, CONF_IP_ADDRESS: new_ip},
+                )
+                self.hass.config_entries.async_schedule_reload(
+                    self.config_entry.entry_id
+                )
+            return

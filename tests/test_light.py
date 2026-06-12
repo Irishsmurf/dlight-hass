@@ -1,49 +1,10 @@
+import asyncio
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch
 from homeassistant.components.light import DOMAIN as LIGHT_DOMAIN
-from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.dlight.const import DOMAIN, CONF_DEVICE_ID
-
-@pytest.fixture
-def mock_dlight_device():
-    """Mock a dLight device (patched where it is created: the package root)."""
-    with patch("custom_components.dlight.DLightDevice", autospec=True) as mock_device_class:
-        mock_device = mock_device_class.return_value
-        mock_device.id = "test_device_id"
-        mock_device.ip = "127.0.0.1"
-        mock_device.get_state = AsyncMock(return_value={"on": True, "brightness": 50, "color": {"temperature": 4000}})
-        mock_device.get_info = AsyncMock(return_value={
-            "status": "SUCCESS",
-            "swVersion": "1.0.0",
-            "hwVersion": "1.0.0",
-            "deviceModel": "Test Lamp",
-            "macAddress": "AA:BB:CC:DD:EE:FF"
-        })
-        mock_device.turn_on = AsyncMock()
-        mock_device.turn_off = AsyncMock()
-        mock_device.set_brightness = AsyncMock()
-        mock_device.set_color_temperature = AsyncMock()
-        yield mock_device
-
-from datetime import timedelta
-from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
-
-@pytest.fixture
-def mock_config_entry():
-    """Create a mock config entry."""
-    return MockConfigEntry(
-        domain=DOMAIN,
-        data={
-            CONF_IP_ADDRESS: "127.0.0.1",
-            CONF_DEVICE_ID: "test_device_id",
-            CONF_NAME: "Test Light"
-        },
-        title="Test Light",
-        entry_id="test_entry_id"
-    )
+from custom_components.dlight.const import DOMAIN
 
 async def test_light_setup(hass, mock_dlight_device, mock_config_entry):
     """Test setting up the dLight light platform."""
@@ -229,8 +190,8 @@ async def test_light_turn_on_no_args(hass, mock_dlight_device, mock_config_entry
     assert hass.states.get("light.test_light").state == "on"
 
 async def test_light_service_error(hass, mock_dlight_device, mock_config_entry):
-    """Test that a ServiceValidationError is raised when a service call fails."""
-    from homeassistant.exceptions import ServiceValidationError
+    """Test that a HomeAssistantError is raised when a service call fails."""
+    from homeassistant.exceptions import HomeAssistantError
     mock_config_entry.add_to_hass(hass)
 
     with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
@@ -240,11 +201,104 @@ async def test_light_service_error(hass, mock_dlight_device, mock_config_entry):
     # Mock a failure during turn_on
     mock_dlight_device.turn_on.side_effect = Exception("Lamp exploded")
 
-    # In tests, ServiceValidationError message is resolved by the translation engine.
-    # However, since we are in a test environment without full translations loaded,
-    # it might just show the key or a default message.
-    with pytest.raises(ServiceValidationError):
+    # Communication failures are HomeAssistantError (device unreachable), not
+    # ServiceValidationError (which would imply the user's input was invalid).
+    with pytest.raises(HomeAssistantError):
         await hass.services.async_call(
             LIGHT_DOMAIN, "turn_on", {"entity_id": "light.test_light"}, blocking=True
         )
 
+
+
+async def test_light_supports_transition(hass, mock_dlight_device, mock_config_entry):
+    """The entity must advertise transition support (emulated fades)."""
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    state = hass.states.get("light.test_light")
+    from homeassistant.components.light import LightEntityFeature
+    assert state.attributes["supported_features"] & LightEntityFeature.TRANSITION
+
+async def test_light_turn_on_with_transition(hass, mock_dlight_device, mock_config_entry):
+    """A transition fades brightness/temperature in steps and lands on target."""
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Initial confirmed state: on, 50%, 4000K. Fade to 100% / 3000K over 1s
+    # -> 2 steps: (75%, 3500K) then (100%, 3000K).
+    mock_dlight_device.get_state.return_value = {"on": True, "brightness": 100, "color": {"temperature": 3000}}
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "brightness": 255, "color_temp_kelvin": 3000, "transition": 1},
+        blocking=True,
+    )
+    await hass.async_block_till_done()  # waits for the tracked fade task
+
+    assert [c.args[0] for c in mock_dlight_device.set_brightness.call_args_list] == [75, 100]
+    assert [c.args[0] for c in mock_dlight_device.set_color_temperature.call_args_list] == [3500, 3000]
+
+    state = hass.states.get("light.test_light")
+    assert state.state == "on"
+    assert state.attributes.get("brightness") == 255
+    assert state.attributes.get("color_temp_kelvin") == 3000
+
+async def test_light_turn_off_with_transition(hass, mock_dlight_device, mock_config_entry):
+    """A turn_off transition fades brightness down before the power command."""
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    mock_dlight_device.get_state.return_value = {"on": False, "brightness": 0, "color": {"temperature": 4000}}
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_off",
+        {"entity_id": "light.test_light", "transition": 1},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    # From 50% in 2 steps: an intermediate dim, then the 1% floor, then off.
+    brightness_calls = [c.args[0] for c in mock_dlight_device.set_brightness.call_args_list]
+    assert brightness_calls[-1] == 1
+    assert all(0 < b < 50 for b in brightness_calls)
+    mock_dlight_device.turn_off.assert_called_once()
+    assert hass.states.get("light.test_light").state == "off"
+
+async def test_light_transition_cancelled_by_new_command(hass, mock_dlight_device, mock_config_entry):
+    """A new command interrupts a running fade; no further steps are sent."""
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Long fade: 20s -> 40 steps every 0.5s. Only the first step (eager) runs
+    # before the instant command below cancels the task.
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "brightness": 255, "transition": 20},
+        blocking=True,
+    )
+    mock_dlight_device.get_state.return_value = {"on": True, "brightness": 20, "color": {"temperature": 4000}}
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "brightness": 51},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    calls_after_cancel = len(mock_dlight_device.set_brightness.call_args_list)
+    assert mock_dlight_device.set_brightness.call_args_list[-1].args[0] == 20  # 51/255 -> 20%
+    assert hass.states.get("light.test_light").attributes.get("brightness") == 51
+
+    # Were the fade still alive, its next step would fire within 0.5s.
+    await asyncio.sleep(0.7)
+    await hass.async_block_till_done()
+    assert len(mock_dlight_device.set_brightness.call_args_list) == calls_after_cancel

@@ -37,6 +37,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
 
     coordinator = DLightCoordinator(
         hass,
+        entry,
         device,
         name=entry.title or f"dLight {device_id}",
     )

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from dlightclient import (
@@ -30,8 +30,15 @@ from dlightclient import (
 
 from homeassistant import config_entries, exceptions
 from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import device_registry as dr
+
+if TYPE_CHECKING:
+    # Import for typing only: pulling in the dhcp component at runtime would
+    # drag its requirements (aiodhcpwatcher etc.) into environments that
+    # never use DHCP discovery, like the test suite.
+    from homeassistant.components.dhcp import DhcpServiceInfo
 
 from .const import (
     CONF_DEVICE_ID,
@@ -96,14 +103,6 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the flow with an empty discovery cache."""
         self._discovered: dict[str, dict[str, Any]] = {}
-
-    @staticmethod
-    @callback
-    def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> "DLightOptionsFlow":
-        """Expose the per-entry options flow (poll interval tuning)."""
-        return DLightOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -206,6 +205,31 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
         )
+
+    async def async_step_dhcp(self, discovery_info: DhcpServiceInfo) -> FlowResult:
+        """A known lamp renewed its DHCP lease: self-heal its stored IP.
+
+        The manifest matcher is `registered_devices` only, so this fires just
+        for MAC addresses already in the device registry. DHCP traffic has no
+        dLight device id, so the chain is MAC -> registry device -> our
+        identifier; the standard unique-id machinery then updates the entry's
+        IP (and reloads it) before aborting.
+        """
+        mac = dr.format_mac(discovery_info.macaddress)
+        device = dr.async_get(self.hass).async_get_device(
+            connections={(dr.CONNECTION_NETWORK_MAC, mac)}
+        )
+        if device is not None:
+            device_id = next(
+                (id_ for domain, id_ in device.identifiers if domain == DOMAIN),
+                None,
+            )
+            if device_id is not None:
+                await self.async_set_unique_id(f"dlight_{device_id}")
+                self._abort_if_unique_id_configured(
+                    updates={CONF_IP_ADDRESS: discovery_info.ip}
+                )
+        return self.async_abort(reason="unknown_device")
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None

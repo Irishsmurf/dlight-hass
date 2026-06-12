@@ -41,7 +41,8 @@
         "abort": {
             "already_configured": "This lamp is already configured. Its stored IP address has been refreshed.",
             "reconfigure_successful": "Reconfiguration was successful.",
-            "unique_id_mismatch": "That device ID belongs to a different lamp. Reconfigure can only update this entry's lamp."
+            "unique_id_mismatch": "That device ID belongs to a different lamp. Reconfigure can only update this entry's lamp.",
+            "unknown_device": "This network device does not match any configured dLight lamp."
         }
     },
     "exceptions": {
@@ -50,6 +51,9 @@
         },
         "turn_off_failed": {
             "message": "Failed to turn off {device_name}. Device reported: {error}"
+        },
+        "identify_failed": {
+            "message": "Failed to identify {device_name}. Device reported: {error}"
         }
     }
 }

@@ -3,9 +3,10 @@
     "name": "dLight",
     "codeowners": ["@irishsmurf"],
     "config_flow": true,
+    "dhcp": [{"registered_devices": true}],
     "documentation": "https://github.com/Irishsmurf/dlight-hass",
     "iot_class": "local_polling",
     "issue_tracker": "https://github.com/Irishsmurf/dlight-hass/issues",
     "requirements": ["dlight-client==1.6.1"],
-    "version": "1.5.3"
+    "version": "1.6.0"
 }

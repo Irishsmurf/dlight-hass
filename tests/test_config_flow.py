@@ -200,3 +200,81 @@ async def test_flow_reconfigure_rejects_different_lamp(hass):
 
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "unique_id_mismatch"
+
+async def test_no_options_flow(hass):
+    """Regression: the options flow was removed (ADR-0010), and a leftover
+    async_get_options_flow hook would make HA render a broken Configure button."""
+    from custom_components.dlight.config_flow import DLightConfigFlow
+
+    entry = MockConfigEntry(domain=DOMAIN)
+    assert not DLightConfigFlow.async_supports_options_flow(entry)
+
+# --- DHCP discovery -------------------------------------------------------
+
+from dataclasses import dataclass
+
+@dataclass
+class _DhcpInfo:
+    """Stand-in for DhcpServiceInfo (whose module needs deps absent here)."""
+    ip: str
+    hostname: str
+    macaddress: str
+
+async def _add_entry_with_registered_mac(hass, ip="192.168.1.10"):
+    """Create a configured lamp whose MAC is in the device registry."""
+    from homeassistant.helpers import device_registry as dr
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_IP_ADDRESS: ip, CONF_DEVICE_ID: "test_id"},
+        title="Test Lamp",
+        unique_id="dlight_test_id",
+    )
+    entry.add_to_hass(hass)
+    dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "test_id")},
+        connections={(dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:dd:ee:ff")},
+    )
+    return entry
+
+async def test_dhcp_discovery_heals_changed_ip(hass):
+    """A DHCP lease for a known MAC on a new IP updates the entry."""
+    entry = await _add_entry_with_registered_mac(hass, ip="192.168.1.10")
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_DHCP},
+        data=_DhcpInfo(ip="192.168.1.99", hostname="dlight", macaddress="aabbccddeeff"),
+    )
+
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert entry.data[CONF_IP_ADDRESS] == "192.168.1.99"
+
+async def test_dhcp_discovery_same_ip_aborts_quietly(hass):
+    """A lease renewal on the same IP changes nothing."""
+    entry = await _add_entry_with_registered_mac(hass, ip="192.168.1.10")
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_DHCP},
+        data=_DhcpInfo(ip="192.168.1.10", hostname="dlight", macaddress="aabbccddeeff"),
+    )
+
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert entry.data[CONF_IP_ADDRESS] == "192.168.1.10"
+
+async def test_dhcp_discovery_unknown_mac_aborts(hass):
+    """DHCP traffic from a MAC we don't know is ignored."""
+    await _add_entry_with_registered_mac(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_DHCP},
+        data=_DhcpInfo(ip="192.168.1.50", hostname="other", macaddress="112233445566"),
+    )
+
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "unknown_device"

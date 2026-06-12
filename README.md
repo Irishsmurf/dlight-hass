@@ -69,7 +69,7 @@ If a lamp's IP address changes, use **Reconfigure** from the entry menu — or s
 ## Development
 
 - Run the test suite with `pytest` (see `AGENTS.md` for architecture notes).
-- `custom_components/dlight/brand/` holds the logo assets required by the HACS brands validation; the long-term home for these is a [home-assistant/brands](https://github.com/home-assistant/brands) submission.
+- `custom_components/dlight/brand/` holds the logo assets. Home Assistant 2026.3+ serves these locally via the [brands proxy](https://developers.home-assistant.io/blog/2026/02/24/brands-proxy-api/), so the integration icon displays without a `home-assistant/brands` submission; the HACS brands validation also checks this path.
 - **Releasing:** bump the version in `manifest.json`, commit, and push a matching `vX.Y.Z` tag — the Release workflow runs the tests, builds `dlight.zip` (what HACS installs), and publishes the GitHub release automatically.
 
 **Disclaimer:**

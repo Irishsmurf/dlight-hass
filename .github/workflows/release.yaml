@@ -51,11 +51,12 @@ jobs:
 
       - name: Build dlight.zip
         # HACS zip_release convention: manifest.json at the zip root.
-        # brand/ is only needed in the repo tree (HACS brands check);
-        # users' installs don't need it.
+        # brand/ must ship in the zip: HA 2026.3+ serves it via the local
+        # brands proxy so the integration icon displays without a
+        # home-assistant/brands submission.
         run: |
           cd custom_components/dlight
-          zip -r "$GITHUB_WORKSPACE/dlight.zip" . -x "brand/*" -x "__pycache__/*"
+          zip -r "$GITHUB_WORKSPACE/dlight.zip" . -x "__pycache__/*"
           unzip -l "$GITHUB_WORKSPACE/dlight.zip"
 
       - name: Create release

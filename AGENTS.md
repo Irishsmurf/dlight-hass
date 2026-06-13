@@ -7,7 +7,7 @@
 `dlight` is a Home Assistant custom integration providing **local control** for dLight smart lamps via the `dlight-client` Python library (UDP discovery + TCP commands). No cloud dependency.
 
 - **Domain:** `dlight` — one config entry per physical lamp, unique ID `dlight_{device_id}`.
-- **Requires:** Python 3.12+, Home Assistant 2024.1+ (developed against 2025.1 APIs), `dlight-client==1.6.1`.
+- **Requires:** Python 3.12+, Home Assistant 2024.1+ (developed against 2025.1 APIs), `dlight-client==2.0.0`.
 
 ## Architecture
 

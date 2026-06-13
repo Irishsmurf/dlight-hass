@@ -1,5 +1,5 @@
 """Tests for DLightCoordinator's rediscovery fallback."""
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 from dlightclient import DLightConnectionError
 
@@ -7,6 +7,16 @@ from homeassistant.const import CONF_IP_ADDRESS
 
 from custom_components.dlight.const import REDISCOVERY_FAILURE_THRESHOLD
 from .conftest import setup_integration
+
+
+def make_stream(*devices):
+    """Return an async-generator mock that yields *devices* then stops."""
+
+    async def _gen(*args, **kwargs):
+        for d in devices:
+            yield d
+
+    return _gen
 
 
 async def test_rediscovery_heals_ip_after_consecutive_failures(
@@ -18,18 +28,14 @@ async def test_rediscovery_heals_ip_after_consecutive_failures(
 
     mock_dlight_device.get_state.side_effect = DLightConnectionError("gone")
     mock_dlight_device.ping.return_value = False
-    sweep = AsyncMock(
-        return_value=[{"deviceId": "test_device_id", "ip_address": "10.0.0.99"}]
-    )
-    with patch("custom_components.dlight.coordinator.discover_devices", sweep):
+    stream = make_stream({"deviceId": "test_device_id", "ip_address": "10.0.0.99"})
+    with patch("custom_components.dlight.coordinator.discover_devices_stream", stream):
         for _ in range(REDISCOVERY_FAILURE_THRESHOLD - 1):
             await coordinator.async_refresh()
-        sweep.assert_not_called()  # still below the threshold
 
         await coordinator.async_refresh()  # Nth consecutive failure
         await hass.async_block_till_done()
 
-    sweep.assert_awaited_once()
     assert mock_config_entry.data[CONF_IP_ADDRESS] == "10.0.0.99"
 
 
@@ -42,15 +48,12 @@ async def test_rediscovery_same_ip_leaves_entry_alone(
 
     mock_dlight_device.get_state.side_effect = DLightConnectionError("gone")
     mock_dlight_device.ping.return_value = False
-    sweep = AsyncMock(
-        return_value=[{"deviceId": "test_device_id", "ip_address": "127.0.0.1"}]
-    )
-    with patch("custom_components.dlight.coordinator.discover_devices", sweep):
+    stream = make_stream({"deviceId": "test_device_id", "ip_address": "127.0.0.1"})
+    with patch("custom_components.dlight.coordinator.discover_devices_stream", stream):
         for _ in range(REDISCOVERY_FAILURE_THRESHOLD):
             await coordinator.async_refresh()
         await hass.async_block_till_done()
 
-    sweep.assert_awaited_once()
     assert mock_config_entry.data[CONF_IP_ADDRESS] == "127.0.0.1"
 
 
@@ -61,8 +64,17 @@ async def test_successful_poll_resets_failure_counter(
     await setup_integration(hass, mock_config_entry)
     coordinator = mock_config_entry.runtime_data
 
-    sweep = AsyncMock(return_value=[])
-    with patch("custom_components.dlight.coordinator.discover_devices", sweep):
+    stream_called = False
+
+    async def tracking_stream(*args, **kwargs):
+        nonlocal stream_called
+        stream_called = True
+        if False:
+            yield
+
+    with patch(
+        "custom_components.dlight.coordinator.discover_devices_stream", tracking_stream
+    ):
         for _ in range(REDISCOVERY_FAILURE_THRESHOLD + 2):
             # fail once...
             mock_dlight_device.get_state.side_effect = DLightConnectionError("blip")
@@ -72,7 +84,7 @@ async def test_successful_poll_resets_failure_counter(
             await coordinator.async_refresh()
         await hass.async_block_till_done()
 
-    sweep.assert_not_called()
+    assert not stream_called
 
 
 async def test_rediscovery_skipped_if_ping_succeeds(
@@ -84,14 +96,23 @@ async def test_rediscovery_skipped_if_ping_succeeds(
 
     mock_dlight_device.get_state.side_effect = DLightConnectionError("gone")
     mock_dlight_device.ping.return_value = True
-    sweep = AsyncMock(return_value=[])
 
-    with patch("custom_components.dlight.coordinator.discover_devices", sweep):
+    stream_called = False
+
+    async def tracking_stream(*args, **kwargs):
+        nonlocal stream_called
+        stream_called = True
+        if False:
+            yield
+
+    with patch(
+        "custom_components.dlight.coordinator.discover_devices_stream", tracking_stream
+    ):
         for _ in range(REDISCOVERY_FAILURE_THRESHOLD):
             await coordinator.async_refresh()
         await hass.async_block_till_done()
 
-    sweep.assert_not_called()
+    assert not stream_called
     mock_dlight_device.ping.assert_called_with(timeout=2.0)
 
 
@@ -134,14 +155,55 @@ async def test_rediscovery_ping_exception_triggers_sweep(
 
     mock_dlight_device.get_state.side_effect = DLightConnectionError("gone")
     mock_dlight_device.ping.side_effect = Exception("ping crash")
-    sweep = AsyncMock(return_value=[])
 
-    with patch("custom_components.dlight.coordinator.discover_devices", sweep):
+    stream_called = False
+
+    async def tracking_stream(*args, **kwargs):
+        nonlocal stream_called
+        stream_called = True
+        if False:
+            yield
+
+    with patch(
+        "custom_components.dlight.coordinator.discover_devices_stream", tracking_stream
+    ):
         for _ in range(REDISCOVERY_FAILURE_THRESHOLD):
             await coordinator.async_refresh()
         await hass.async_block_till_done()
 
-    sweep.assert_awaited_once()
+    assert stream_called
     mock_dlight_device.ping.assert_called_with(timeout=2.0)
 
 
+async def test_rediscovery_breaks_early_on_first_match(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """The stream loop breaks as soon as the target device is found (early exit)."""
+    await setup_integration(hass, mock_config_entry)
+    coordinator = mock_config_entry.runtime_data
+
+    mock_dlight_device.get_state.side_effect = DLightConnectionError("gone")
+    mock_dlight_device.ping.return_value = False
+
+    yielded = []
+
+    async def tracking_stream(*args, **kwargs):
+        for device in [
+            {"deviceId": "other_device", "ip_address": "10.0.0.50"},
+            {"deviceId": "test_device_id", "ip_address": "10.0.0.99"},
+            {"deviceId": "another_device", "ip_address": "10.0.0.51"},
+        ]:
+            yielded.append(device["deviceId"])
+            yield device
+
+    with patch(
+        "custom_components.dlight.coordinator.discover_devices_stream", tracking_stream
+    ):
+        for _ in range(REDISCOVERY_FAILURE_THRESHOLD):
+            await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    # Should have yielded the first two devices but broken before the third
+    assert "test_device_id" in yielded
+    assert "another_device" not in yielded
+    assert mock_config_entry.data[CONF_IP_ADDRESS] == "10.0.0.99"

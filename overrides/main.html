@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+<!--
+  Open Graph / Twitter link-preview card.
+  Points every page at the branded social card in docs/assets/. Uses the
+  page-specific title/description where available, falling back to site config.
+-->
+{% block extrahead %}
+  {% if page %}
+    {% set page_title = page.meta.title | default(page.title, true) | default(config.site_name, true) %}
+    {% set page_desc = page.meta.description | default(config.site_description, true) %}
+  {% else %}
+    {% set page_title = config.site_name %}
+    {% set page_desc = config.site_description %}
+  {% endif %}
+  {% set image = (config.site_url | default('', true)) ~ 'assets/social-card.png' %}
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ page_title }}">
+  <meta property="og:description" content="{{ page_desc }}">
+  <meta property="og:image" content="{{ image }}">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ page_title }}">
+  <meta name="twitter:description" content="{{ page_desc }}">
+  <meta name="twitter:image" content="{{ image }}">
+{% endblock %}

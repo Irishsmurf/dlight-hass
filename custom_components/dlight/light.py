@@ -350,6 +350,31 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
         await self.coordinator.async_request_refresh()
 
+    async def async_toggle(self, **kwargs: Any) -> None:
+        """Toggle the light using the device's native toggle command."""
+        await self._async_cancel_transition()
+        try:
+            async with self.coordinator.command_lock:
+                await self.device.toggle()
+        except Exception as err:
+            _LOGGER.exception("Failed to toggle dLight %s", self.device.id)
+            self._clear_optimistic_state()
+            self.async_write_ha_state()
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="toggle_failed",
+                translation_placeholders={
+                    "device_name": self._base_name,
+                    "error": str(err),
+                },
+            ) from err
+
+        # Update optimistic state
+        self._last_command_time = time.monotonic()
+        self._optimistic_on = not self.is_on
+        self.async_write_ha_state()
+        await self.coordinator.async_request_refresh()
+
     async def _send(self, commands: list) -> None:
         """Run device commands concurrently; raise the first failure, if any.
 

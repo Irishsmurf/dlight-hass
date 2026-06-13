@@ -52,6 +52,9 @@
         "turn_off_failed": {
             "message": "Échec de l'extinction de {device_name}. L'appareil a signalé : {error}"
         },
+        "toggle_failed": {
+            "message": "Échec du basculement de {device_name}. L'appareil a signalé : {error}"
+        },
         "identify_failed": {
             "message": "Échec de l'identification de {device_name}. L'appareil a signalé : {error}"
         }

@@ -52,6 +52,9 @@
         "turn_off_failed": {
             "message": "Fehler beim Ausschalten von {device_name}. Das Gerät meldete: {error}"
         },
+        "toggle_failed": {
+            "message": "Fehler beim Umschalten von {device_name}. Das Gerät meldete: {error}"
+        },
         "identify_failed": {
             "message": "Fehler beim Identifizieren von {device_name}. Das Gerät meldete: {error}"
         }

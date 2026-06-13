@@ -52,6 +52,9 @@
         "turn_off_failed": {
             "message": "Failed to turn off {device_name}. Device reported: {error}"
         },
+        "toggle_failed": {
+            "message": "Failed to toggle {device_name}. Device reported: {error}"
+        },
         "identify_failed": {
             "message": "Failed to identify {device_name}. Device reported: {error}"
         }

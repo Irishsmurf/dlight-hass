@@ -429,7 +429,10 @@ async def test_light_toggle(hass, mock_dlight_device, mock_config_entry):
     # Update mock to reflect expected state after toggle (turned off)
     mock_dlight_device.get_state.return_value = {"on": False, "brightness": 0, "color": {"temperature": 4000}}
 
-    # Call async_toggle directly
+    # Call async_toggle directly on the entity.
+    # Note: We call async_toggle directly because Home Assistant's component-level
+    # light.toggle service handler is hardcoded to check light.is_on and call
+    # async_turn_off/async_turn_on, completely bypassing the entity's async_toggle.
     await entity.async_toggle()
 
     # Verify device toggle method was called
@@ -456,6 +459,7 @@ async def test_light_toggle_error(hass, mock_dlight_device, mock_config_entry):
     # Mock a failure during toggle
     mock_dlight_device.toggle.side_effect = Exception("Lamp command timed out")
 
+    # Call async_toggle directly on the entity
     with pytest.raises(HomeAssistantError):
         await entity.async_toggle()
 

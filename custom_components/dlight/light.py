@@ -371,7 +371,14 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
         # Update optimistic state
         self._last_command_time = time.monotonic()
-        self._optimistic_on = not self.is_on
+        predicted_on = not self.is_on
+        self._optimistic_on = predicted_on
+        if predicted_on:
+            self._optimistic_brightness = self.brightness or 255
+            self._optimistic_kelvin = self.color_temp_kelvin or KELVIN_MIN
+        else:
+            self._optimistic_brightness = None
+            self._optimistic_kelvin = None
         self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
 

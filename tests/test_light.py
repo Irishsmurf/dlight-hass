@@ -302,3 +302,119 @@ async def test_light_transition_cancelled_by_new_command(hass, mock_dlight_devic
     await asyncio.sleep(0.7)
     await hass.async_block_till_done()
     assert len(mock_dlight_device.set_brightness.call_args_list) == calls_after_cancel
+
+async def test_rapid_fire_brightness_not_clobbered(hass, mock_dlight_device, mock_config_entry):
+    """Rapid brightness changes must not be reverted by a stale poll.
+
+    Scenario: the user drags a slider quickly — command A, then command B.
+    A stale poll (still showing A's result) arrives before the lamp has
+    processed B.  Without the rapid-fire guard, the UI would snap back to A.
+    """
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data
+
+    fake_time = 1000.0
+
+    def monotonic():
+        return fake_time
+
+    with patch("custom_components.dlight.light.time") as mock_time:
+        mock_time.monotonic = monotonic
+
+        # Command A: set brightness to ~40%
+        mock_dlight_device.get_state.return_value = {
+            "on": True, "brightness": 40, "color": {"temperature": 4000}
+        }
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "brightness": 102},
+            blocking=True,
+        )
+        state = hass.states.get("light.test_light")
+        assert state.attributes.get("brightness") == 102
+
+        # Command B: set brightness to ~80% 1 second later.
+        fake_time = 1001.0
+        mock_dlight_device.get_state.return_value = {
+            "on": True, "brightness": 80, "color": {"temperature": 4000}
+        }
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "brightness": 204},
+            blocking=True,
+        )
+        state = hass.states.get("light.test_light")
+        assert state.attributes.get("brightness") == 204
+
+        # Simulate a stale poll arriving with command A's result (40%),
+        # still within the hold window after command B.
+        fake_time = 1005.0  # 4s after B, well within the 30s POLL_INTERVAL
+        mock_dlight_device.get_state.return_value = {
+            "on": True, "brightness": 40, "color": {"temperature": 4000}
+        }
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        # The UI must still show 204 (command B's optimistic value).
+        state = hass.states.get("light.test_light")
+        assert state.attributes.get("brightness") == 204
+
+        # Advance past the hold window.  The next poll is trusted.
+        fake_time = 1032.0  # 31s after command B
+        mock_dlight_device.get_state.return_value = {
+            "on": True, "brightness": 80, "color": {"temperature": 4000}
+        }
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        # Optimistic state cleared; confirmed 80% = ceil(80/100*255) = 204.
+        state = hass.states.get("light.test_light")
+        assert state.attributes.get("brightness") == 204
+
+
+async def test_single_command_poll_clears_optimistic(hass, mock_dlight_device, mock_config_entry):
+    """A poll arriving after the hold window should clear optimistic state normally."""
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data
+
+    fake_time = 1000.0
+
+    def monotonic():
+        return fake_time
+
+    with patch("custom_components.dlight.light.time") as mock_time:
+        mock_time.monotonic = monotonic
+
+        # Single command: set brightness to 100%.
+        mock_dlight_device.get_state.return_value = {
+            "on": True, "brightness": 100, "color": {"temperature": 4000}
+        }
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "brightness": 255},
+            blocking=True,
+        )
+        state = hass.states.get("light.test_light")
+        assert state.attributes.get("brightness") == 255
+
+        # Advance past the hold window, then poll.
+        fake_time = 1031.0
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        # Optimistic state cleared; confirmed 100% = 255.
+        state = hass.states.get("light.test_light")
+        assert state.attributes.get("brightness") == 255

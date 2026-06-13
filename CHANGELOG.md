@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Prevent UI inconsistencies during toggling by properly setting or clearing optimistic brightness and color temperature values in `async_toggle`.
+- Defensively handle potential exceptions from lightweight ping checks in setup and rediscovery.
 
 ## [1.6.6] - 2026-06-13
 

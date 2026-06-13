@@ -73,7 +73,12 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         Failure is tolerated: the info payload is cosmetic (device registry
         card), and a lamp that can't answer get_info may still control fine.
         """
-        if not await self.device.ping(timeout=2.0):
+        try:
+            ping_ok = await self.device.ping(timeout=2.0)
+        except Exception:  # noqa: BLE001 — defensively catch any errors in ping
+            ping_ok = False
+
+        if not ping_ok:
             _LOGGER.warning(
                 "Device %s is offline during setup ping check (will show generic card)",
                 self.device.id,
@@ -163,7 +168,12 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.device.id,
             self._consecutive_failures,
         )
-        if await self.device.ping(timeout=2.0):
+        try:
+            ping_ok = await self.device.ping(timeout=2.0)
+        except Exception:  # noqa: BLE001 — defensively catch any errors in ping
+            ping_ok = False
+
+        if ping_ok:
             _LOGGER.debug(
                 "dLight %s is reachable on current IP %s via ping; skipping UDP sweep",
                 self.device.id,

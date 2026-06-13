@@ -109,3 +109,39 @@ async def test_coordinator_setup_ping_failure(
     mock_dlight_device.ping.assert_called_with(timeout=2.0)
     mock_dlight_device.get_info.assert_not_called()
 
+
+async def test_coordinator_setup_ping_exception(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """If ping raises an exception during setup, we treat it as offline, return early and skip get_info."""
+    mock_dlight_device.ping.side_effect = Exception("ping crash")
+
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    mock_dlight_device.ping.assert_called_with(timeout=2.0)
+    mock_dlight_device.get_info.assert_not_called()
+
+
+async def test_rediscovery_ping_exception_triggers_sweep(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """If ping raises an exception during rediscovery, we proceed with the UDP sweep."""
+    await setup_integration(hass, mock_config_entry)
+    coordinator = mock_config_entry.runtime_data
+
+    mock_dlight_device.get_state.side_effect = DLightConnectionError("gone")
+    mock_dlight_device.ping.side_effect = Exception("ping crash")
+    sweep = AsyncMock(return_value=[])
+
+    with patch("custom_components.dlight.coordinator.discover_devices", sweep):
+        for _ in range(REDISCOVERY_FAILURE_THRESHOLD):
+            await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    sweep.assert_awaited_once()
+    mock_dlight_device.ping.assert_called_with(timeout=2.0)
+
+

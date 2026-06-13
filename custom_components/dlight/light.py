@@ -8,10 +8,12 @@ immediately so the UI feels instant; the next confirmed poll replaces the
 guess with the device's reported truth.
 
 Rapid-fire guard: after each command, optimistic state is protected for one
-full poll interval.  Any poll arriving within this window is considered stale
-(the lamp may not have executed the newest command yet) and the UI keeps the
-optimistic value.  Once the window expires, the next poll clears the override
-and the confirmed state takes over.
+full poll interval.  A poll arriving within this window is compared against
+the optimistic expectation — if the lamp confirms the command (polled state
+matches what we asked for), optimistic state is cleared immediately for
+instant UI confirmation.  If the poll returns stale data (state mismatch),
+it is ignored so the UI doesn't snap back.  Once the window expires, any
+poll clears the override regardless.
 
 Transitions: the lamp protocol has no native fade, so `transition:` is
 emulated — a background task walks brightness/temperature toward the target
@@ -524,10 +526,11 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
         Guards against stale polls in two cases:
           1. A fade is in progress — the fade owns the UI until it finishes.
-          2. The last command was sent less than one poll interval ago.
-             The lamp may not have processed it yet, so the polled state is
-             potentially stale.  Keep the optimistic view until the hold
-             window expires.
+          2. The last command was sent less than one poll interval ago *and*
+             the polled state does not match what we optimistically predicted.
+             A matching poll means the lamp confirmed the command — clear
+             the optimistic state immediately.  A mismatching poll is stale
+             and is ignored so the UI doesn't snap back.
         """
         if self.coordinator.data is None:
             return  # failed poll; availability handling is CoordinatorEntity's job
@@ -540,8 +543,31 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             self._optimistic_on is not None
             and time.monotonic() - self._last_command_time < POLL_INTERVAL
         ):
-            # Within the hold window: ignore this poll to prevent the UI from
-            # snapping back to a stale value during rapid-fire interactions.
-            return
+            data = self.coordinator.data
+            polled_on = data.get("on")
+            polled_brightness = data.get("brightness")
+            polled_kelvin = (
+                data.get("color", {}).get("temperature")
+                if isinstance(data.get("color"), dict)
+                else None
+            )
+
+            matches = True
+            if self._optimistic_on != polled_on:
+                matches = False
+            if self._optimistic_brightness is not None:
+                if _to_dlight_brightness(self._optimistic_brightness) != polled_brightness:
+                    matches = False
+            if (
+                self._optimistic_kelvin is not None
+                and self._optimistic_kelvin != polled_kelvin
+            ):
+                matches = False
+
+            if not matches:
+                # Within the hold window and state doesn't match: ignore
+                # this poll to prevent the UI from snapping back to a stale
+                # value during rapid-fire interactions.
+                return
         self._clear_optimistic_state()
         super()._handle_coordinator_update()

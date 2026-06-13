@@ -1,4 +1,13 @@
-# dLight Home Assistant Integration
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="custom_components/dlight/brand/dark_logo.png">
+    <img src="custom_components/dlight/brand/logo.png" alt="dLight" width="360">
+  </picture>
+</p>
+
+<h1 align="center">
+  <img src="custom_components/dlight/brand/icon.png" alt="" width="28" align="top"> dLight Home Assistant Integration
+</h1>
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 [![Tests](https://github.com/Irishsmurf/dlight-hass/actions/workflows/tests.yaml/badge.svg)](https://github.com/Irishsmurf/dlight-hass/actions/workflows/tests.yaml)

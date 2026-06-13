@@ -12,10 +12,11 @@ from datetime import timedelta
 from typing import Any
 
 from dlightclient import STATUS_SUCCESS, DLightDevice, DLightError, discover_devices
+from dlightclient.models import DeviceState
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_IP_ADDRESS
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -66,6 +67,26 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # most one UDP sweep in flight at a time.
         self._consecutive_failures = 0
         self._rediscovery_task: asyncio.Task | None = None
+
+    @callback
+    def _handle_device_state_change(
+        self,
+        device: DLightDevice,
+        old_state: DeviceState,
+        new_state: DeviceState,
+    ) -> None:
+        """Handle state change notifications from the device.
+
+        DeviceState is a TypedDict, so new_state is already a plain dict at
+        runtime — no conversion is needed before handing it to the coordinator.
+        """
+        _LOGGER.debug(
+            "dLight %s state listener fired: %s -> %s",
+            device.id,
+            old_state,
+            new_state,
+        )
+        self.async_set_updated_data(new_state)
 
     async def _async_setup(self) -> None:
         """Fetch the lamp's static info once, before the first state poll.

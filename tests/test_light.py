@@ -464,3 +464,75 @@ async def test_light_toggle_error(hass, mock_dlight_device, mock_config_entry):
         await entity.async_toggle()
 
     mock_dlight_device.toggle.assert_called_once()
+
+
+async def test_turn_on_with_brightness_while_off_sends_power_command(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """Regression: turn_on(brightness=X) while lamp is off must send turn_on().
+
+    Previously, optimistic state (_optimistic_on=True) was written before the
+    command list was assembled.  The guard `if not commands or not self.is_on`
+    then read the already-mutated optimistic value (True), so the explicit
+    turn_on() power command was never inserted when brightness was provided —
+    leaving a powered-off lamp receiving only a set_brightness call.
+    """
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Turn the lamp off first so is_on is False.
+    await hass.services.async_call(
+        LIGHT_DOMAIN, "turn_off", {"entity_id": "light.test_light"}, blocking=True
+    )
+    assert hass.states.get("light.test_light").state == "off"
+    mock_dlight_device.turn_on.reset_mock()
+
+    # Now call turn_on WITH a brightness argument while the lamp is still off.
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "brightness": 128},
+        blocking=True,
+    )
+
+    # The explicit power-on command MUST have been sent even though brightness
+    # was supplied (brightness alone doesn't power the lamp on).
+    mock_dlight_device.turn_on.assert_called_once()
+    # ceil(128 / 255 * 100) = 51
+    mock_dlight_device.set_brightness.assert_called_with(51)
+
+
+async def test_turn_on_with_kelvin_while_off_sends_power_command(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """Regression: turn_on(color_temp_kelvin=K) while off must still send turn_on().
+
+    Companion to the brightness variant above — covers the same was_on bug for
+    a colour-temperature-only turn_on call.
+    """
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Turn off first.
+    await hass.services.async_call(
+        LIGHT_DOMAIN, "turn_off", {"entity_id": "light.test_light"}, blocking=True
+    )
+    assert hass.states.get("light.test_light").state == "off"
+    mock_dlight_device.turn_on.reset_mock()
+
+    # Call turn_on with only a colour temperature while the lamp is off.
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "color_temp_kelvin": 3000},
+        blocking=True,
+    )
+
+    # turn_on() must be in the command batch regardless of optimistic overrides.
+    mock_dlight_device.turn_on.assert_called_once()
+    mock_dlight_device.set_color_temperature.assert_called_with(3000)
+

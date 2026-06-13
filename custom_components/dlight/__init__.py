@@ -46,6 +46,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 
+    # Register the push state listener only after a successful first refresh.
+    # This avoids a memory leak / reference cycle when setup fails: if
+    # async_config_entry_first_refresh raises, the unload hooks below are never
+    # called, so we must not have registered the listener yet.
+    coordinator.device.on_state_change(coordinator._handle_device_state_change)
+    entry.async_on_unload(
+        lambda: coordinator.device.remove_state_listener(
+            coordinator._handle_device_state_change
+        )
+    )
+
     # Ensure the persistent connection is closed when the entry is unloaded.
     entry.async_on_unload(client.close)
 

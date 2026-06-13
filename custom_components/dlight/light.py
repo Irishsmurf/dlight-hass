@@ -261,6 +261,24 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         ):
             return
 
+        # Capture current on-state before mutating optimistic properties.
+        # Commands accepted: predict the outcome. Values not in this call keep
+        # their last known state, with sane defaults when nothing is known.
+        was_on = self.is_on
+        self._last_command_time = time.monotonic()
+        self._optimistic_on = True
+        self._optimistic_brightness = (
+            brightness if brightness is not None else self.brightness
+        )
+        if self._optimistic_brightness is None:
+            self._optimistic_brightness = 255  # unknown -> assume full
+        self._optimistic_kelvin = (
+            kelvin if kelvin is not None else self.color_temp_kelvin
+        )
+        if self._optimistic_kelvin is None:
+            self._optimistic_kelvin = KELVIN_MIN  # unknown -> assume warm
+        self.async_write_ha_state()
+
         commands = []
         if brightness is not None:
             commands.append(self.device.set_brightness(_to_dlight_brightness(brightness)))
@@ -269,7 +287,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         # Setting brightness/temperature implicitly powers the lamp on, so the
         # explicit power command is only needed for a bare turn_on call, or
         # when the lamp is (as far as we know) currently off.
-        if not commands or not self.is_on:
+        if not commands or not was_on:
             commands.insert(0, self.device.turn_on())
 
         try:
@@ -289,25 +307,6 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                 },
             ) from err
 
-        # Commands accepted: predict the outcome. Values not in this call keep
-        # their last known state, with sane defaults when nothing is known.
-        self._last_command_time = time.monotonic()
-        self._optimistic_on = True
-        self._optimistic_brightness = (
-            brightness if brightness is not None else self.brightness
-        )
-        if self._optimistic_brightness is None:
-            self._optimistic_brightness = 255  # unknown -> assume full
-        self._optimistic_kelvin = (
-            kelvin if kelvin is not None else self.color_temp_kelvin
-        )
-        if self._optimistic_kelvin is None:
-            self._optimistic_kelvin = KELVIN_MIN  # unknown -> assume warm
-        self.async_write_ha_state()
-
-        # Schedule a poll to swap the guess for confirmed state.
-        await self.coordinator.async_request_refresh()
-
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the light off (optimistically, confirmed by the next poll).
 
@@ -325,6 +324,13 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         ):
             return
 
+        # Predict "off"; brightness/temperature are meaningless while off.
+        self._last_command_time = time.monotonic()
+        self._optimistic_on = False
+        self._optimistic_brightness = None
+        self._optimistic_kelvin = None
+        self.async_write_ha_state()
+
         try:
             async with self.coordinator.command_lock:
                 await self.device.turn_off()
@@ -341,18 +347,21 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                 },
             ) from err
 
-        # Predict "off"; brightness/temperature are meaningless while off.
-        self._last_command_time = time.monotonic()
-        self._optimistic_on = False
-        self._optimistic_brightness = None
-        self._optimistic_kelvin = None
-        self.async_write_ha_state()
-
-        await self.coordinator.async_request_refresh()
-
     async def async_toggle(self, **kwargs: Any) -> None:
         """Toggle the light using the device's native toggle command."""
         await self._async_cancel_transition()
+        # Update optimistic state
+        self._last_command_time = time.monotonic()
+        predicted_on = not self.is_on
+        self._optimistic_on = predicted_on
+        if predicted_on:
+            self._optimistic_brightness = self.brightness or 255
+            self._optimistic_kelvin = self.color_temp_kelvin or KELVIN_MIN
+        else:
+            self._optimistic_brightness = None
+            self._optimistic_kelvin = None
+        self.async_write_ha_state()
+
         try:
             async with self.coordinator.command_lock:
                 await self.device.toggle()
@@ -368,19 +377,6 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                     "error": str(err),
                 },
             ) from err
-
-        # Update optimistic state
-        self._last_command_time = time.monotonic()
-        predicted_on = not self.is_on
-        self._optimistic_on = predicted_on
-        if predicted_on:
-            self._optimistic_brightness = self.brightness or 255
-            self._optimistic_kelvin = self.color_temp_kelvin or KELVIN_MIN
-        else:
-            self._optimistic_brightness = None
-            self._optimistic_kelvin = None
-        self.async_write_ha_state()
-        await self.coordinator.async_request_refresh()
 
     async def _send(self, commands: list) -> None:
         """Run device commands concurrently; raise the first failure, if any.
@@ -524,11 +520,12 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             self._clear_optimistic_state()
             self.async_write_ha_state()
 
-        # Drop the task reference *before* the refresh: _handle_coordinator_update
-        # ignores polls while a fade is "active", and this fade is done — its
-        # closing refresh must be allowed through to reconcile state.
+        # Drop the task reference *before* updating state: _handle_coordinator_update
+        # ignores updates while a fade is "active", and this fade is done. Calling
+        # _handle_coordinator_update immediately reconciles the optimistic state
+        # with the latest state listener data without waiting for another poll.
         self._transition_task = None
-        await self.coordinator.async_request_refresh()
+        self._handle_coordinator_update()
 
     async def _async_cancel_transition(self) -> None:
         """Stop any in-flight fade and wait for it to fully unwind."""

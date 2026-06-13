@@ -19,6 +19,20 @@ Discovery is a UDP broadcast with a short listen window. It can come up empty wh
 
 **Workaround:** add the lamp manually. Find its IP in your router's client list and its device ID on the lamp's label, then use the **Manually add a device** step. See [Configuration](../getting-started/configuration.md#manual-step).
 
+### Docker Desktop on Windows or macOS
+
+This is the most common reason discovery never works. Docker Desktop runs your containers inside a **WSL 2 / Hyper-V Linux VM that sits behind NAT**, so:
+
+- The lamp's UDP discovery **broadcast can't cross the NAT** into the VM, and the container can't broadcast onto your physical LAN — `discover_devices()` hears nothing.
+- `--network host` / `network_mode: host` **does not help here** — on Docker Desktop "host" is the Linux VM's network, not your Windows/macOS LAN adapter. (It only enables LAN broadcast on a real Linux host.)
+- Outbound **unicast TCP** to the lamp's IP *does* traverse the NAT — which is why **manual entry works fine** even though discovery doesn't.
+
+The same limitation means [IP self-healing](../getting-started/configuration.md#ip-self-healing) can't work either (it relies on UDP discovery or HA seeing DHCP leases). So:
+
+1. **Add the lamp manually** (IP + Device ID) — fully supported, and the right path for this setup.
+2. **Set a DHCP reservation** in your router for the lamp's MAC so its IP never changes — otherwise a new lease will silently take the lamp offline with no way to auto-recover.
+3. If you specifically want discovery and self-healing to work, run HA where it has a real LAN presence instead: **Home Assistant OS in a VM with a bridged network adapter**, or HA in Docker on a **Linux** host/Raspberry Pi with `network_mode: host`.
+
 ## "Failed to connect to the lamp"
 
 Shown when the validation probe can't reach the lamp during setup or reconfigure. Check that:

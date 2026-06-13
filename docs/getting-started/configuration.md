@@ -65,6 +65,9 @@ DHCP routers reassign addresses over time. This integration recovers from that a
 
 In every case the config entry is updated and reloaded so the running coordinator targets the new address — no delete-and-re-add required.
 
+!!! warning "Needs UDP/DHCP visibility — won't work behind Docker Desktop NAT"
+    All three paths rely on either UDP discovery or Home Assistant seeing the lamp's DHCP lease. In environments where neither reaches the LAN — most notably **Docker Desktop on Windows/macOS** — self-healing can't run, so a changed IP will silently take the lamp offline. The fix is to **pin the lamp's IP with a router DHCP reservation**. See [Docker Desktop on Windows or macOS](../user-guide/troubleshooting.md#docker-desktop-on-windows-or-macos).
+
 !!! info "How it works under the hood"
     The mechanics live in [Config Flow & IP Self-Healing](../architecture/config-flow.md) and [Coordinator & Polling](../architecture/coordinator.md).
 

@@ -302,3 +302,109 @@ async def test_light_transition_cancelled_by_new_command(hass, mock_dlight_devic
     await asyncio.sleep(0.7)
     await hass.async_block_till_done()
     assert len(mock_dlight_device.set_brightness.call_args_list) == calls_after_cancel
+
+async def test_rapid_fire_brightness_not_clobbered(hass, mock_dlight_device, mock_config_entry):
+    """Rapid brightness changes must not be reverted by a stale poll."""
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data
+
+    fake_time = 1000.0
+
+    def monotonic():
+        return fake_time
+
+    with patch("custom_components.dlight.light.time") as mock_time:
+        mock_time.monotonic = monotonic
+
+        # Command A: set brightness to ~40%
+        mock_dlight_device.get_state.return_value = {
+            "on": True, "brightness": 40, "color": {"temperature": 4000}
+        }
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "brightness": 102},
+            blocking=True,
+        )
+        state = hass.states.get("light.test_light")
+        assert state.attributes.get("brightness") == 102
+
+        # Command B: set brightness to ~80% 1 second later.
+        # The immediate poll returns the stale 40% value (lamp hasn't
+        # processed B yet).
+        fake_time = 1001.0
+        mock_dlight_device.get_state.return_value = {
+            "on": True, "brightness": 40, "color": {"temperature": 4000}
+        }
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "brightness": 204},
+            blocking=True,
+        )
+        # The UI must still show 204 (command B's optimistic value) because
+        # the stale poll was ignored.
+        state = hass.states.get("light.test_light")
+        assert state.attributes.get("brightness") == 204
+
+        # Now the lamp has processed B, so the next poll returns 80%.
+        # This matches optimistic state, so it is accepted immediately —
+        # no need to wait for the hold window to expire.
+        fake_time = 1005.0
+        mock_dlight_device.get_state.return_value = {
+            "on": True, "brightness": 80, "color": {"temperature": 4000}
+        }
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        # The poll matches the optimistic state, so it is accepted and cleared.
+        state = hass.states.get("light.test_light")
+        assert state.attributes.get("brightness") == 204
+
+
+async def test_single_command_poll_clears_optimistic(hass, mock_dlight_device, mock_config_entry):
+    """A matching poll within the hold window clears optimistic state immediately."""
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data
+
+    fake_time = 1000.0
+
+    def monotonic():
+        return fake_time
+
+    with patch("custom_components.dlight.light.time") as mock_time:
+        mock_time.monotonic = monotonic
+
+        # Single command: set brightness to 100%.
+        # The immediate poll returns 100% (lamp processed it quickly).
+        mock_dlight_device.get_state.return_value = {
+            "on": True, "brightness": 100, "color": {"temperature": 4000}
+        }
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "brightness": 255},
+            blocking=True,
+        )
+        state = hass.states.get("light.test_light")
+        assert state.attributes.get("brightness") == 255
+
+        # Poll arrives with matching state — still within the hold window
+        # but the state matches, so optimistic state is cleared immediately.
+        fake_time = 1002.0  # only 2s later, well within 30s window
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        # Optimistic state cleared; confirmed 100% = 255.
+        state = hass.states.get("light.test_light")
+        assert state.attributes.get("brightness") == 255

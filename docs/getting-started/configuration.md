@@ -6,18 +6,22 @@ dLight is configured **entirely through the Home Assistant UI** — there is no 
 
 1. Go to **Settings → Devices & Services**.
 2. Click **+ Add Integration** and search for **dLight**.
-3. The integration **scans your network** (a ~2 second UDP discovery sweep).
-4. Either:
-   - **Pick a discovered lamp** from the list, or
-   - Choose **Manually add a device** and enter the lamp's details.
+3. The integration runs a brief (~2 second) UDP discovery sweep **in the background** — there is no separate "scanning…" screen. What you see next depends on whether it found anything:
+   - **Lamps found** → a pick-list of discovered lamps (see [Discovery step](#discovery-step)).
+   - **Nothing found** → the manual entry form opens directly (see [Manual step](#manual-step)).
+
+!!! warning "Went straight to an IP / Device ID form? That's expected."
+    If the dialog jumps directly to asking for an **IP address** and **Device ID**, discovery found **no lamps** on your network, so it fell back to manual entry. There is no separate scan screen and no *"Manually add a device"* button on its own — that option only appears **inside** the discovery pick-list, which isn't shown when nothing is discovered.
+
+    Discovery commonly finds nothing when Home Assistant runs in **Docker/a container or VM without host networking**, when HA and the lamp are on **different subnets/VLANs**, or when the lamp **isn't on Wi-Fi yet**. You can fill in the manual form to add the lamp anyway — see [Discovery finds no lamps](../user-guide/troubleshooting.md#discovery-finds-no-lamps) to fix discovery itself.
 
 ### Discovery step
 
-If any lamps answer the broadcast, you get a pick-list showing each as `<model> (<ip>)`. Selecting one pre-fills the manual form, which validates the connection before creating the entry.
+When one or more lamps answer the broadcast, you get a pick-list showing each as `<model> (<ip>)`, **plus a final *"Manually add a device"* entry** to bypass discovery. Selecting a lamp pre-fills the manual form, which validates the connection before creating the entry.
 
 ### Manual step
 
-If discovery finds nothing — or you prefer to type the details — provide:
+This is where you land when discovery finds nothing — or reach by choosing *"Manually add a device"* in the pick-list. Provide:
 
 | Field | Required | Description |
 |---|---|---|

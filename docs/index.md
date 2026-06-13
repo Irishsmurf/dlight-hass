@@ -57,7 +57,7 @@ hide:
 
 1. **Install** via [HACS](getting-started/installation.md#hacs-recommended) (recommended) or [manually](getting-started/installation.md#manual).
 2. **Restart** Home Assistant.
-3. **Add the integration** — Settings → Devices & Services → **+ Add Integration** → search *dLight*. Discovery finds lamps on your LAN automatically. See [Configuration](getting-started/configuration.md).
+3. **Add the integration** — Settings → Devices & Services → **+ Add Integration** → search *dLight*. Discovery runs automatically; if it finds nothing (common in containerized HA setups), you add the lamp by **IP address + Device ID**. See [Configuration](getting-started/configuration.md).
 
 !!! tip "Provisioning first"
     A dLight must already be on your Wi-Fi before Home Assistant can see it. Do the initial Wi-Fi setup in the Google Home app (or equivalent), then add it here.

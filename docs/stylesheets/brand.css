@@ -24,15 +24,21 @@
   --md-primary-fg-color: var(--dlight-blue);
   --md-primary-fg-color--light: var(--dlight-blue-light);
   --md-primary-fg-color--dark: #2f6ad6;
+  /* White header text/icons so the white logo mark reads on the blue bar. */
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
   --md-accent-fg-color: var(--dlight-blue);
   --md-typeset-a-color: var(--dlight-blue);
 }
 
-/* Dark scheme: lightened brand blue so it stays legible on slate. */
+/* Dark scheme: keep the header brand blue (so the white logo stays legible),
+   but use the lightened blue for in-page links/accents on the dark canvas. */
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: var(--dlight-blue-light);
+  --md-primary-fg-color: var(--dlight-blue);
   --md-primary-fg-color--light: var(--dlight-blue-light);
-  --md-primary-fg-color--dark: var(--dlight-blue);
+  --md-primary-fg-color--dark: #2f6ad6;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
   --md-accent-fg-color: var(--dlight-blue-light);
   --md-typeset-a-color: var(--dlight-blue-light);
 }

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="dLight">
+  <defs>
+    <linearGradient id="temp" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFB54D"/>
+      <stop offset="0.5" stop-color="#FFF1DC"/>
+      <stop offset="1" stop-color="#7CACF8"/>
+    </linearGradient>
+  </defs>
+  <!-- Header variant: lamp body in white so it reads on the brand-blue app bar -->
+  <rect x="76" y="76" width="360" height="200" rx="100" fill="#FFFFFF"/>
+  <rect x="104" y="104" width="304" height="144" rx="72" fill="url(#temp)"/>
+  <rect x="242" y="268" width="28" height="146" fill="#FFFFFF"/>
+  <rect x="156" y="402" width="200" height="32" rx="16" fill="#FFFFFF"/>
+</svg>

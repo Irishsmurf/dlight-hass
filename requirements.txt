@@ -1,1 +1,1 @@
-dlight-client==1.6.1
+dlight-client==2.0.0

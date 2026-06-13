@@ -408,3 +408,59 @@ async def test_single_command_poll_clears_optimistic(hass, mock_dlight_device, m
         # Optimistic state cleared; confirmed 100% = 255.
         state = hass.states.get("light.test_light")
         assert state.attributes.get("brightness") == 255
+
+
+async def test_light_toggle(hass, mock_dlight_device, mock_config_entry):
+    """Test toggling the dLight light."""
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Initial state is ON
+    state = hass.states.get("light.test_light")
+    assert state.state == "on"
+
+    # Get the entity instance from EntityComponent
+    entity = hass.data["light"].get_entity("light.test_light")
+    assert entity is not None
+
+    # Update mock to reflect expected state after toggle (turned off)
+    mock_dlight_device.get_state.return_value = {"on": False, "brightness": 0, "color": {"temperature": 4000}}
+
+    # Call async_toggle directly on the entity.
+    # Note: We call async_toggle directly because Home Assistant's component-level
+    # light.toggle service handler is hardcoded to check light.is_on and call
+    # async_turn_off/async_turn_on, completely bypassing the entity's async_toggle.
+    await entity.async_toggle()
+
+    # Verify device toggle method was called
+    mock_dlight_device.toggle.assert_called_once()
+
+    # Verify state updated optimistically to off
+    state = hass.states.get("light.test_light")
+    assert state.state == "off"
+
+
+async def test_light_toggle_error(hass, mock_dlight_device, mock_config_entry):
+    """Test that toggle service raises HomeAssistantError on device error."""
+    from homeassistant.exceptions import HomeAssistantError
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Get the entity instance from EntityComponent
+    entity = hass.data["light"].get_entity("light.test_light")
+    assert entity is not None
+
+    # Mock a failure during toggle
+    mock_dlight_device.toggle.side_effect = Exception("Lamp command timed out")
+
+    # Call async_toggle directly on the entity
+    with pytest.raises(HomeAssistantError):
+        await entity.async_toggle()
+
+    mock_dlight_device.toggle.assert_called_once()

@@ -52,6 +52,9 @@
         "turn_off_failed": {
             "message": "{device_name} のオフに失敗しました。デバイスの報告: {error}"
         },
+        "toggle_failed": {
+            "message": "{device_name} の切り替えに失敗しました。デバイスの報告: {error}"
+        },
         "identify_failed": {
             "message": "{device_name} の識別に失敗しました。デバイスの報告: {error}"
         }

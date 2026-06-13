@@ -38,3 +38,5 @@ dlight-client-*
 
 # MkDocs build output
 site/
+
+.agents/

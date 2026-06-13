@@ -52,6 +52,9 @@
         "turn_off_failed": {
             "message": "Theip ar mhúchadh {device_name}. Thuairiscigh an gléas: {error}"
         },
+        "toggle_failed": {
+            "message": "Theip ar scoránú {device_name}. Thuairiscigh an gléas: {error}"
+        },
         "identify_failed": {
             "message": "Theip ar {device_name} a aithint. Thuairiscigh an gléas: {error}"
         }

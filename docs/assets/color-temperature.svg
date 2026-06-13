@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 180" role="img" aria-label="dLight tunable white range, 2600 Kelvin warm to 6000 Kelvin cool">
+  <defs>
+    <linearGradient id="temp" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFB54D"/>
+      <stop offset="0.5" stop-color="#FFF1DC"/>
+      <stop offset="1" stop-color="#7CACF8"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .h { font: 700 22px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #3C4043; }
+    .k { font: 700 18px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #3C4043; }
+    .c { font: 600 14px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #5f6368; }
+    .t { stroke: #9aa0a6; stroke-width: 2; }
+  </style>
+
+  <text x="40" y="34" class="h">Tunable white</text>
+  <text x="720" y="34" class="c" text-anchor="end">color_temp · ColorMode.COLOR_TEMP</text>
+
+  <!-- the spectrum bar -->
+  <rect x="40" y="60" width="680" height="56" rx="28" fill="url(#temp)"/>
+
+  <!-- end + midpoint ticks -->
+  <line x1="40"  y1="120" x2="40"  y2="134" class="t"/>
+  <line x1="380" y1="120" x2="380" y2="132" class="t"/>
+  <line x1="720" y1="120" x2="720" y2="134" class="t"/>
+
+  <text x="40"  y="158" class="k" text-anchor="start">2600 K</text>
+  <text x="380" y="156" class="c" text-anchor="middle">≈ 4300 K</text>
+  <text x="720" y="158" class="k" text-anchor="end">6000 K</text>
+
+  <text x="40"  y="50" class="c" text-anchor="start">Warm</text>
+  <text x="720" y="50" class="c" text-anchor="end">Cool</text>
+</svg>

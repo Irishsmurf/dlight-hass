@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 460" role="img" aria-label="A dLight lamp glowing in tunable white">
+  <defs>
+    <linearGradient id="temp" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFB54D"/>
+      <stop offset="0.5" stop-color="#FFF1DC"/>
+      <stop offset="1" stop-color="#7CACF8"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.55">
+      <stop offset="0" stop-color="#FFF1DC" stop-opacity="0.95"/>
+      <stop offset="0.45" stop-color="#FFE0B2" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#7CACF8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- soft tunable-white halo behind the lamp head -->
+  <ellipse cx="340" cy="190" rx="300" ry="210" fill="url(#glow)"/>
+
+  <!-- light beams -->
+  <g opacity="0.5" stroke="url(#temp)" stroke-width="6" stroke-linecap="round">
+    <line x1="340" y1="46" x2="340" y2="14"/>
+    <line x1="455" y1="70"  x2="478" y2="44"/>
+    <line x1="225" y1="70"  x2="202" y2="44"/>
+    <line x1="520" y1="170" x2="556" y2="162"/>
+    <line x1="160" y1="170" x2="124" y2="162"/>
+  </g>
+
+  <!-- the lamp mark, centered and scaled up -->
+  <g transform="translate(170,40) scale(0.66)">
+    <rect x="76" y="76" width="360" height="200" rx="100" fill="#4285F4"/>
+    <rect x="104" y="104" width="304" height="144" rx="72" fill="url(#temp)"/>
+    <rect x="242" y="268" width="28" height="146" fill="#4285F4"/>
+    <rect x="156" y="402" width="200" height="32" rx="16" fill="#4285F4"/>
+  </g>
+</svg>

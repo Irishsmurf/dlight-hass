@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="dLight for Home Assistant — local control for dLight smart lamps">
+  <defs>
+    <linearGradient id="temp" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFB54D"/>
+      <stop offset="0.5" stop-color="#FFF1DC"/>
+      <stop offset="1" stop-color="#7CACF8"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#3C4043"/>
+      <stop offset="1" stop-color="#202529"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#FFF1DC" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#7CACF8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <ellipse cx="600" cy="250" rx="560" ry="330" fill="url(#glow)"/>
+
+  <!-- logo: mark + outlined Comfortaa Bold wordmark (dark-background variant) -->
+  <svg x="190" y="150" width="820" height="205" viewBox="76 76 1435.30 358" preserveAspectRatio="xMidYMid meet">
+    <rect x="76" y="76" width="360" height="200" rx="100" fill="#8AB4F8"/>
+    <rect x="104" y="104" width="304" height="144" rx="72" fill="url(#temp)"/>
+    <rect x="242" y="268" width="28" height="146" fill="#8AB4F8"/>
+    <rect x="156" y="402" width="200" height="32" rx="16" fill="#8AB4F8"/>
+    <g fill="#E8EAED" transform="translate(500.0,358.82) scale(0.300000,-0.300000)">
+      <path transform="translate(0.00,0.00)" d="M338 -4Q260 -4 197.5 32.5Q135 69 98.5 132.0Q62 195 62 274Q62 353 95.5 415.5Q129 478 187.0 514.5Q245 551 318 551Q377 551 427.0 526.5Q477 502 511 460V730Q511 753 525.5 767.0Q540 781 562 781Q585 781 599.0 767.0Q613 753 613 730V274Q613 195 576.5 132.0Q540 69 478.0 32.5Q416 -4 338 -4ZM338 86Q389 86 429.0 110.5Q469 135 492.0 178.0Q515 221 515 274Q515 328 492.0 370.0Q469 412 429.0 436.5Q389 461 338 461Q288 461 247.5 436.5Q207 412 183.5 370.0Q160 328 160 274Q160 221 183.5 178.0Q207 135 247.5 110.5Q288 86 338 86Z"/>
+      <path transform="translate(703.00,0.00)" d="M151 0Q129 0 114.5 15.0Q100 30 100 52V729Q100 751 115.0 766.0Q130 781 151 781Q173 781 188.0 766.0Q203 751 203 729V104H565Q587 104 602.0 89.0Q617 74 617 52Q617 30 602.0 15.0Q587 0 565 0Z"/>
+      <path transform="translate(1345.00,0.00)" d="M151 0Q129 0 114.5 14.5Q100 29 100 51V496Q100 519 114.5 533.0Q129 547 151 547Q174 547 188.0 533.0Q202 519 202 496V51Q202 29 188.0 14.5Q174 0 151 0ZM151 636Q124 636 104.5 655.5Q85 675 85 702Q85 729 104.5 748.5Q124 768 151 768Q178 768 197.5 748.5Q217 729 217 702Q217 675 197.5 655.5Q178 636 151 636Z"/>
+      <path transform="translate(1647.00,0.00)" d="M318 -4Q243 -4 185.5 31.5Q128 67 95.0 129.5Q62 192 62 273Q62 355 97.5 417.5Q133 480 195.0 515.5Q257 551 338 551Q418 551 480.0 515.5Q542 480 577.5 417.5Q613 355 613 273H554Q554 192 523.5 129.5Q493 67 440.0 31.5Q387 -4 318 -4ZM336 -227Q265 -227 203.0 -199.0Q141 -171 98 -117Q85 -100 88.5 -82.0Q92 -64 108 -53Q126 -41 145.5 -45.0Q165 -49 177 -65Q204 -99 245.0 -118.0Q286 -137 338 -137Q386 -137 426.5 -114.0Q467 -91 491.0 -46.0Q515 -1 515 64V206L548 294L613 273V57Q613 -22 578.0 -86.5Q543 -151 480.5 -189.0Q418 -227 336 -227ZM338 86Q390 86 430.0 110.0Q470 134 492.5 176.0Q515 218 515 273Q515 328 492.5 370.5Q470 413 430.0 437.0Q390 461 338 461Q286 461 246.0 437.0Q206 413 183.0 370.5Q160 328 160 273Q160 218 183.0 176.0Q206 134 246.0 110.0Q286 86 338 86Z"/>
+      <path transform="translate(2322.00,0.00)" d="M141 199Q119 199 104.5 213.5Q90 228 90 250V730Q90 753 104.5 767.0Q119 781 141 781Q164 781 178.0 767.0Q192 753 192 730V250Q192 228 178.0 213.5Q164 199 141 199ZM552 -1Q530 -1 515.5 13.5Q501 28 501 50V296Q501 353 480.0 389.0Q459 425 423.5 442.5Q388 460 342 460Q300 460 266.0 443.0Q232 426 212.0 397.5Q192 369 192 332H129Q129 395 159.5 444.5Q190 494 243.0 523.0Q296 552 362 552Q431 552 485.5 522.5Q540 493 571.5 436.0Q603 379 603 296V50Q603 28 588.5 13.5Q574 -1 552 -1ZM141 -1Q119 -1 104.5 13.5Q90 28 90 50V496Q90 519 104.5 533.0Q119 547 141 547Q164 547 178.0 533.0Q192 519 192 496V50Q192 28 178.0 13.5Q164 -1 141 -1Z"/>
+      <path transform="translate(3005.00,0.00)" d="M289 0Q239 0 199.0 25.5Q159 51 136.0 95.0Q113 139 113 194V671Q113 693 127.0 707.0Q141 721 163 721Q185 721 199.0 707.0Q213 693 213 671V194Q213 154 235.0 127.0Q257 100 289 100H323Q341 100 353.5 86.0Q366 72 366 50Q366 28 349.5 14.0Q333 0 307 0ZM67 441Q46 441 33.0 453.0Q20 465 20 483Q20 503 33.0 515.0Q46 527 67 527H298Q319 527 332.0 515.0Q345 503 345 483Q345 465 332.0 453.0Q319 441 298 441Z"/>
+    </g>
+  </svg>
+
+  <text x="600" y="430" text-anchor="middle" fill="#E8EAED"
+        font-family="DejaVu Sans, system-ui, Segoe UI, Roboto, sans-serif" font-size="34" font-weight="700">Home Assistant integration</text>
+  <text x="600" y="478" text-anchor="middle" fill="#9aa0a6"
+        font-family="DejaVu Sans, system-ui, Segoe UI, Roboto, sans-serif" font-size="24" font-weight="400">Local control for dLight smart lamps — no cloud, low latency</text>
+
+  <!-- chips -->
+  <g font-family="DejaVu Sans, system-ui, sans-serif" font-size="20" font-weight="700" text-anchor="middle">
+    <rect x="372" y="512" width="150" height="44" rx="22" fill="#2b3035" stroke="#4285F4" stroke-opacity="0.5"/>
+    <text x="447" y="540" fill="#8AB4F8">Fully local</text>
+    <rect x="538" y="512" width="124" height="44" rx="22" fill="#2b3035" stroke="#4285F4" stroke-opacity="0.5"/>
+    <text x="600" y="540" fill="#8AB4F8">2600–6000 K</text>
+    <rect x="678" y="512" width="150" height="44" rx="22" fill="#2b3035" stroke="#4285F4" stroke-opacity="0.5"/>
+    <text x="753" y="540" fill="#8AB4F8">HACS ready</text>
+  </g>
+
+  <!-- tunable-white footer rule -->
+  <rect x="0" y="618" width="1200" height="12" fill="url(#temp)"/>
+</svg>

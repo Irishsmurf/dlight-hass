@@ -5,81 +5,78 @@
   </picture>
 </p>
 
-<h1 align="center">
-  <img src="custom_components/dlight/brand/icon.png" alt="" width="28" align="top"> dLight Home Assistant Integration
-</h1>
+<p align="center">
+  <strong>Local control for dLight smart lamps in Home Assistant — no cloud, low latency.</strong>
+</p>
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
-[![Tests](https://github.com/Irishsmurf/dlight-hass/actions/workflows/tests.yaml/badge.svg)](https://github.com/Irishsmurf/dlight-hass/actions/workflows/tests.yaml)
-[![Hassfest](https://github.com/Irishsmurf/dlight-hass/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/Irishsmurf/dlight-hass/actions/workflows/hassfest.yaml)
-[![HACS Action](https://github.com/Irishsmurf/dlight-hass/actions/workflows/hacs.yaml/badge.svg)](https://github.com/Irishsmurf/dlight-hass/actions/workflows/hacs.yaml)
+<p align="center">
+  <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Default-orange.svg" alt="HACS Default"></a>
+  <a href="https://github.com/Irishsmurf/dlight-hass/actions/workflows/tests.yaml"><img src="https://github.com/Irishsmurf/dlight-hass/actions/workflows/tests.yaml/badge.svg" alt="Tests"></a>
+  <a href="https://github.com/Irishsmurf/dlight-hass/actions/workflows/hassfest.yaml"><img src="https://github.com/Irishsmurf/dlight-hass/actions/workflows/hassfest.yaml/badge.svg" alt="Hassfest"></a>
+  <a href="https://github.com/Irishsmurf/dlight-hass/actions/workflows/hacs.yaml"><img src="https://github.com/Irishsmurf/dlight-hass/actions/workflows/hacs.yaml/badge.svg" alt="HACS Action"></a>
+</p>
 
-## Purpose
+---
 
-This is a custom integration for Home Assistant to control dLight smart lamps locally. It utilizes the `dlight-client` Python library to provide seamless control of your dLight devices without relying on cloud services.
+**dLight** is a custom [Home Assistant](https://www.home-assistant.io/) integration that controls dLight smart lamps **entirely on your local network**. It uses UDP discovery and persistent TCP connections via the [`dlight-client`](https://pypi.org/project/dlight-client/) library — no cloud account, no vendor API, no internet dependency once the lamp is on your Wi-Fi.
 
-## Features
+## 📖 Documentation
 
-- **Automatic Discovery:** Automatically find dLight devices on your network.
-- **Full Control:** Turn them on/off, adjust brightness (0-100%), and change the color temperature (2600K - 6000K).
-- **Local Control:** Purely local network communication using persistent TCP connections for reduced latency and connection churn.
-- **State Reporting:** Polls the device periodically (30s) to keep states in sync.
-- **Optimistic Updates:** Immediate UI response upon command.
-- **IP Self-Healing:** If your router hands a lamp a new address, re-running discovery (or re-adding the lamp) updates the stored IP automatically — no need to delete and re-add.
-- **Reconfigure Support:** Update a lamp's connection details from the UI (entry menu → Reconfigure).
-- **Diagnostics:** Download a sanitized snapshot (IP and device ID redacted) for bug reports.
-- **Improved Reliability:** Uses `ServiceValidationError` for translatable, user-friendly error feedback in the UI.
-- **Platinum Identification:** Supports hardware tracking via MAC address for more robust device registry integration.
-- **Translations:** English, German, French, Japanese, and Irish.
+**Full docs live at → [irishsmurf.github.io/dlight-hass](https://irishsmurf.github.io/dlight-hass/)**
 
-## Prerequisites
+| | |
+|---|---|
+| 🚀 [Installation](https://irishsmurf.github.io/dlight-hass/getting-started/installation/) | Get it running via HACS or manually. |
+| ⚙️ [Configuration](https://irishsmurf.github.io/dlight-hass/getting-started/configuration/) | Discover and add your lamps. |
+| 💡 [Features](https://irishsmurf.github.io/dlight-hass/user-guide/features/) | Light, identify button, connectivity sensor. |
+| 🔧 [Troubleshooting](https://irishsmurf.github.io/dlight-hass/user-guide/troubleshooting/) | Fix discovery and connectivity issues. |
+| 🏗️ [Architecture](https://irishsmurf.github.io/dlight-hass/architecture/overview/) | How the coordinator, optimistic state, and self-healing work. |
+| 🤝 [Contributing](https://irishsmurf.github.io/dlight-hass/contributing/development/) | Dev setup, testing, translations, releases. |
 
-- Home Assistant instance.
-- dLight devices connected to your **local Wi-Fi network**.
-  - **Note:** Initial Wi-Fi provisioning must be done via the Google Home App or similar before adding to Home Assistant.
+## ✨ Features
 
-## Installation
+- **Purely local** — UDP discovery + persistent TCP commands; no cloud dependency.
+- **Full control** — on/off, brightness (0–100 %), and tunable white from **2600 K to 6000 K**.
+- **Feels instant** — optimistic state updates the UI immediately; a confirmed poll reconciles it.
+- **Emulated transitions** — smooth fades despite the protocol having no native fade.
+- **IP self-healing** — recovers from DHCP address changes via the DHCP watcher, a runtime discovery sweep, or re-running setup.
+- **Diagnostics** — download a sanitized snapshot (IP and device ID redacted) for bug reports.
+- **Reconfigure support** — update a lamp's connection details from the UI.
+- **Localized** — English, German, French, Japanese, and Irish.
 
-### HACS (Recommended)
+## 🚀 Quick start
 
-1.  Add this repository as a custom repository in HACS.
-2.  Search for "dLight" and install it.
-3.  Restart Home Assistant.
+1. **Install** via [HACS](https://irishsmurf.github.io/dlight-hass/getting-started/installation/#hacs-recommended) (add this repo as a custom integration repository) or [manually](https://irishsmurf.github.io/dlight-hass/getting-started/installation/#manual).
+2. **Restart** Home Assistant.
+3. **Add the integration:** Settings → Devices & Services → **+ Add Integration** → search *dLight*. Discovery finds lamps on your LAN automatically.
 
-### Manual
+> [!NOTE]
+> A dLight must already be on your Wi-Fi (provisioned via the Google Home app or similar) before Home Assistant can discover it.
 
-1.  Download the latest release.
-2.  Copy `custom_components/dlight` into your `<config>/custom_components/` directory.
-3.  Restart Home Assistant.
+## 🤝 Contributing
 
-## Configuration
+Bug fixes, features, docs, and translations are all welcome. See the [contributing guide](https://irishsmurf.github.io/dlight-hass/contributing/development/) and the canonical [`AGENTS.md`](AGENTS.md) for architecture notes.
 
-Configuration is handled through the Home Assistant UI:
+```bash
+git clone https://github.com/Irishsmurf/dlight-hass.git
+cd dlight-hass
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+pip install pytest pytest-asyncio pytest-homeassistant-custom-component pytest-sugar
+pytest
+```
 
-1.  Navigate to **Settings** -> **Devices & Services**.
-2.  Click **+ Add Integration**.
-3.  Search for **dLight**.
-4.  The integration will automatically attempt to **discover** devices.
-5.  Select your device from the list or choose to add one manually using its **IP Address** and **Device ID**.
+The docs site is built with MkDocs:
 
-If a lamp's IP address changes, use **Reconfigure** from the entry menu — or simply re-run **Add Integration**, and discovery will heal the stored address automatically.
+```bash
+pip install -r docs/requirements.txt
+mkdocs serve   # http://127.0.0.1:8000
+```
 
-## Troubleshooting
+## 📦 Releases
 
-- **Device Unavailable:**
-  - Ensure the dLight is powered on and connected to your Wi-Fi.
-  - Check the Home Assistant logs for connection errors.
-  - If the lamp's IP changed, re-run discovery or use **Reconfigure**.
-- **Manual Configuration:**
-  - If discovery fails, you can find the IP and Device ID via your router's client list.
-- **Reporting Bugs:**
-  - Attach the integration's diagnostics (device page -> **Download diagnostics**); IP addresses and device IDs are redacted automatically.
+Releases are automated: bump the version in `manifest.json`, commit, and push a matching `vX.Y.Z` tag. The Release workflow runs the tests, builds `dlight.zip` (what HACS installs, including the `brand/` assets), and publishes the GitHub release. See [Releasing](https://irishsmurf.github.io/dlight-hass/contributing/releasing/).
 
-## Development
+## ⚠️ Disclaimer
 
-- Run the test suite with `pytest` (see `AGENTS.md` for architecture notes).
-- `custom_components/dlight/brand/` holds the logo assets. Home Assistant 2026.3+ serves these locally via the [brands proxy](https://developers.home-assistant.io/blog/2026/02/24/brands-proxy-api/), so the integration icon displays without a `home-assistant/brands` submission; the HACS brands validation also checks this path.
-- **Releasing:** bump the version in `manifest.json`, commit, and push a matching `vX.Y.Z` tag — the Release workflow runs the tests, builds `dlight.zip` (what HACS installs), and publishes the GitHub release automatically.
-
-**Disclaimer:**
-- Use at your own risk. This is a personal project and carries no official support.
+This is an unofficial community project with no official vendor support. Use at your own risk. The dLight name and branding identify this integration and the hardware it controls; the project is not affiliated with or endorsed by the hardware vendor.

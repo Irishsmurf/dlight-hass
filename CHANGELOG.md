@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Optimize toggling via native `DLightDevice.toggle()` convenience method.
 - Use lightweight `DLightDevice.ping()` connectivity check for faster setup verification and cheap rediscovery pre-checks.
+- Switch offline rediscovery from `discover_devices()` to `discover_devices_stream()` for early-exit on first match, reducing unnecessary UDP scan time.
 
 ### Changed
 - Simplify state updates and transitions by synchronizing entity and coordinator states via local `dlight-client` state change listener push events rather than calling manual `async_request_refresh` poll requests.

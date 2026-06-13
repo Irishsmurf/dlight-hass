@@ -11,7 +11,7 @@ import logging
 from datetime import timedelta
 from typing import Any
 
-from dlightclient import STATUS_SUCCESS, DLightDevice, DLightError, discover_devices
+from dlightclient import STATUS_SUCCESS, DLightDevice, DLightError, discover_devices_stream
 from dlightclient.models import DeviceState
 
 from homeassistant.config_entries import ConfigEntry
@@ -203,27 +203,24 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
 
         try:
-            devices = await discover_devices(discovery_duration=REDISCOVERY_DURATION)
+            async for found in discover_devices_stream(timeout=REDISCOVERY_DURATION):
+                if found.get("deviceId") != self.device.id:
+                    continue
+                new_ip = found.get("ip_address")
+                if new_ip and new_ip != self.device.ip:
+                    _LOGGER.info(
+                        "dLight %s found at new address %s (was %s); updating entry",
+                        self.device.id,
+                        new_ip,
+                        self.device.ip,
+                    )
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry,
+                        data={**self.config_entry.data, CONF_IP_ADDRESS: new_ip},
+                    )
+                    self.hass.config_entries.async_schedule_reload(
+                        self.config_entry.entry_id
+                    )
+                break
         except Exception:  # noqa: BLE001 — best-effort recovery, never raise
             _LOGGER.debug("dLight rediscovery sweep failed", exc_info=True)
-            return
-
-        for found in devices:
-            if found.get("deviceId") != self.device.id:
-                continue
-            new_ip = found.get("ip_address")
-            if new_ip and new_ip != self.device.ip:
-                _LOGGER.info(
-                    "dLight %s found at new address %s (was %s); updating entry",
-                    self.device.id,
-                    new_ip,
-                    self.device.ip,
-                )
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry,
-                    data={**self.config_entry.data, CONF_IP_ADDRESS: new_ip},
-                )
-                self.hass.config_entries.async_schedule_reload(
-                    self.config_entry.entry_id
-                )
-            return

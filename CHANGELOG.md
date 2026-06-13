@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Optimize toggling via native `DLightDevice.toggle()` convenience method.
+- Use lightweight `DLightDevice.ping()` connectivity check for faster setup verification and cheap rediscovery pre-checks.
 
 ### Fixed
 - Prevent UI inconsistencies during toggling by properly setting or clearing optimistic brightness and color temperature values in `async_toggle`.
+- Defensively handle potential exceptions from lightweight ping checks in setup and rediscovery.
 
 ## [1.6.6] - 2026-06-13
 

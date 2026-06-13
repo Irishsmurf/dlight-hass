@@ -32,6 +32,7 @@ def mock_dlight_device():
         mock_device.turn_on = AsyncMock()
         mock_device.turn_off = AsyncMock()
         mock_device.toggle = AsyncMock()
+        mock_device.ping = AsyncMock(return_value=True)
         mock_device.set_brightness = AsyncMock()
         mock_device.set_color_temperature = AsyncMock()
         mock_device.flash = AsyncMock(return_value=True)

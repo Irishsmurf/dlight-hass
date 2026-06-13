@@ -74,6 +74,18 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         card), and a lamp that can't answer get_info may still control fine.
         """
         try:
+            ping_ok = await self.device.ping(timeout=2.0)
+        except Exception:  # noqa: BLE001 — defensively catch any errors in ping
+            ping_ok = False
+
+        if not ping_ok:
+            _LOGGER.warning(
+                "Device %s is offline during setup ping check (will show generic card)",
+                self.device.id,
+            )
+            return
+
+        try:
             async with asyncio.timeout(POLL_TIMEOUT):
                 info = await self.device.get_info()
         except (TimeoutError, DLightError) as err:
@@ -156,6 +168,19 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.device.id,
             self._consecutive_failures,
         )
+        try:
+            ping_ok = await self.device.ping(timeout=2.0)
+        except Exception:  # noqa: BLE001 — defensively catch any errors in ping
+            ping_ok = False
+
+        if ping_ok:
+            _LOGGER.debug(
+                "dLight %s is reachable on current IP %s via ping; skipping UDP sweep",
+                self.device.id,
+                self.device.ip,
+            )
+            return
+
         try:
             devices = await discover_devices(discovery_duration=REDISCOVERY_DURATION)
         except Exception:  # noqa: BLE001 — best-effort recovery, never raise

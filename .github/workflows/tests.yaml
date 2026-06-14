@@ -33,11 +33,41 @@ jobs:
         run: |
           pytest --cov=custom_components/dlight --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
 
-      - name: Upload coverage to Codecov
+      - name: Upload coverage to Codecov (aggregate)
         uses: codecov/codecov-action@v4
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload coverage — coordinator flag
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: coordinator
+
+      - name: Upload coverage — config_flow flag
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: config_flow
+
+      - name: Upload coverage — light flag
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: light
+
+      - name: Upload coverage — button flag
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: button
+
+      - name: Upload coverage — binary_sensor flag
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: binary_sensor
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}

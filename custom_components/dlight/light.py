@@ -466,6 +466,11 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         else:
             end_pct = None  # already on, brightness untouched
         start_pct = current_pct if is_on else 0
+        # If the lamp is externally set below the floor (e.g. via the dLight
+        # app), anchor the interpolation at MIN_BRIGHTNESS_PCT so the first
+        # fade step doesn't jump visually from sub-floor to the floor value.
+        if start_pct is not None and start_pct > 0:
+            start_pct = max(start_pct, MIN_BRIGHTNESS_PCT)
 
         end_kelvin = int(kelvin) if kelvin is not None else None
         start_kelvin = self.color_temp_kelvin

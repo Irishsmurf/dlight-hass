@@ -69,13 +69,72 @@ AGENTS.md                   # canonical contributor/architecture notes
 
 ## Running against a real (or fake) lamp
 
-You don't need hardware. `tests/fake_lamp.py` simulates a dLight with injectable delays, resets, and hangs for chaos testing:
+You don't need hardware. `tests/fake_lamp.py` simulates a dLight lamp with configurable network faults for end-to-end chaos testing:
 
 ```bash
 python3 tests/fake_lamp.py
 ```
 
 To test against a real Home Assistant instance, symlink or copy `custom_components/dlight/` into a dev HA config's `custom_components/` directory and restart.
+
+## Chaos Testing
+
+`fake_lamp.py` supports injectable failure modes to exercise the coordinator's resilience without real hardware or a bad network.
+
+### Command-line flags
+
+| Flag | Description | Exercises |
+|------|-------------|-----------|
+| `--drop-rate 0.3` | Silently drop 30% of incoming TCP connections | Coordinator reconnect logic |
+| `--error-rate 0.2` | Return invalid (non-JSON) responses for 20% of commands | `UpdateFailed` error path, failure counter |
+| `--latency 500` | Add 500 ms to every response | Timeout threshold (`POLL_TIMEOUT`) |
+| `--latency-spike 5000 0.1` | 5 000 ms spike on 10% of responses | Race between optimistic hold window and slow confirmation |
+| `--disconnect-after 3` | Close TCP after every 3 commands, forcing a reconnect | Persistent-connection re-establishment |
+| `--offline-for 60` | Start silent for 60 s then come back | Rediscovery sweep and self-heal path |
+
+**Example — rediscovery scenario:**
+
+```bash
+python3 tests/fake_lamp.py --offline-for 120 --drop-rate 0.5
+```
+
+Wait for the coordinator to reach `REDISCOVERY_FAILURE_THRESHOLD` failures, then watch the UDP sweep fire in the HA logs.
+
+**Example — rapid-fire guard stress test:**
+
+```bash
+python3 tests/fake_lamp.py --latency 800 --error-rate 0.1
+```
+
+Send brightness slider commands quickly; confirm the UI doesn't snap back to stale poll values within the hold window.
+
+### Runtime commands
+
+Once running, type commands at the prompt:
+
+| Command | Effect |
+|---------|--------|
+| `on` / `off` | Toggle lamp power state |
+| `bright N` | Set brightness (0–100) |
+| `temp N` | Set color temperature (Kelvin) |
+| `chaos on` | Enable all chaos modes at once (drop=30%, error=20%, latency=200ms, spikes, disconnect-after=5) |
+| `chaos off` | Disable all chaos modes |
+| `drop N` | Set drop rate (e.g. `drop 0.4`) |
+| `error N` | Set error rate (e.g. `error 0.15`) |
+| `latency N` | Set base latency in ms (e.g. `latency 300`) |
+| `spike` | Arm a one-shot 10 s latency spike on the next command |
+| `offline N` | Go dark for N seconds (simulates DHCP renewal / power cycle) |
+| `disconnect N` | Close TCP after every N commands (0 to disable) |
+| `status` | Print current lamp and chaos state |
+| `quit` | Shut down |
+
+### What each scenario exercises
+
+- **`--drop-rate`** — The coordinator's persistent `AsyncDLightClient` must reconnect. Tests that `UpdateFailed` is raised and the failure counter increments correctly.
+- **`--error-rate`** — Protocol-level errors (non-JSON) hit the `except DLightError` path in `_async_update_data`. At `REDISCOVERY_FAILURE_THRESHOLD` consecutive failures the UDP sweep fires.
+- **`--latency` / `--latency-spike`** — Responses that arrive after `POLL_TIMEOUT` raise `TimeoutError`. Spikes timed to arrive *within* the optimistic hold window test that the rapid-fire guard correctly suppresses the stale poll.
+- **`--disconnect-after`** — Exercises the persistent-connection re-establishment in `dlight-client`. From the coordinator's perspective the next command should transparently succeed after one failure.
+- **`--offline-for` / `offline N`** — Simulates a lamp losing power or changing IP. After `REDISCOVERY_FAILURE_THRESHOLD` failures the coordinator launches a UDP sweep (`_async_attempt_rediscovery`). Combine with restarting the fake lamp on a different port (and updating `CONF_IP_ADDRESS` in HA) to test the full self-heal path.
 
 ## Submitting changes
 

@@ -23,7 +23,7 @@
             },
             "discovery_none": {
                 "title": "Aucune lampe trouvée",
-                "description": "Aucune lampe dLight n'a répondu à la diffusion UDP de découverte. Cela signifie généralement que le trafic de diffusion est filtré sur votre réseau. Vous pouvez saisir manuellement l'adresse IP de la lampe ou réessayer le scan.",
+                "description": "Aucune lampe dLight n'a répondu à la diffusion UDP de découverte. Cela signifie généralement que le trafic de diffusion est filtré sur votre réseau. Vous pouvez saisir l'adresse IP de la lampe manuellement ou relancer l'analyse.",
                 "menu_options": {
                     "manual": "Saisir l'adresse IP manuellement",
                     "retry": "Réessayer"

@@ -23,7 +23,7 @@
             },
             "discovery_none": {
                 "title": "Keine Lampen gefunden",
-                "description": "Keine dLight-Lampen haben auf den UDP-Discovery-Broadcast geantwortet. Dies bedeutet normalerweise, dass Broadcast-Datenverkehr in deinem Netzwerk gefiltert wird. Du kannst die IP-Adresse der Lampe manuell eingeben oder den Scan erneut starten.",
+                "description": "Keine dLight-Lampen haben auf den UDP-Discovery-Broadcast reagiert. Dies bedeutet normalerweise, dass Broadcast-Datenverkehr in deinem Netzwerk gefiltert wird. Du kannst die IP-Adresse der Lampe manuell eingeben oder den Scan erneut starten.",
                 "menu_options": {
                     "manual": "IP-Adresse manuell eingeben",
                     "retry": "Erneut versuchen"

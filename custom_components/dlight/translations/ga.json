@@ -22,11 +22,11 @@
                 }
             },
             "discovery_none": {
-                "title": "Níor aimsíodh lampaí",
-                "description": "Níor fhreagair aon lampa dLight do chraoladh fionnachtana UDP. Is gnách go gciallaíonn sé seo go bhfuil trácht craolta á scagadh ar do líonra. Is féidir leat seoladh IP an lampa a iontráil de láimh, nó scanadh arís.",
+                "title": "Níor aimsíodh aon lampa",
+                "description": "Níor fhreagair aon lampa dLight don chraoladh UDP aimsitheoireachta. De ghnáth ciallaíonn sé seo go bhfuil trácht craolta á scagadh ar do líonra. Is féidir leat seoladh IP an lampa a iontráil de láimh, nó iarracht eile a dhéanamh.",
                 "menu_options": {
-                    "manual": "Iontráil seoladh IP de láimh",
-                    "retry": "Triail arís"
+                    "manual": "Seoladh IP a iontráil de láimh",
+                    "retry": "Bain triail as arís"
                 }
             },
             "reconfigure": {

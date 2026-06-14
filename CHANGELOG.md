@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-06-14
+
 ### Fixed
 - Refine `discovery_none` translation wording in `de`, `fr`, `ga`, and `ja` locale files for clarity and grammatical accuracy; restore the `en` locale file to match the canonical `strings.json` content.
 

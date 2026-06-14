@@ -15,13 +15,13 @@ async def test_flow_user_manual(hass):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
-        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["type"] == data_entry_flow.FlowResultType.MENU
         assert result["step_id"] == "discovery_none"
 
     # User chooses manual entry
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
-        {"next_action": "manual"},
+        {"next_step_id": "manual"},
     )
     assert result["type"] == data_entry_flow.FlowResultType.FORM
     assert result["step_id"] == "manual"
@@ -100,7 +100,7 @@ async def test_discovery_none_shows_interstitial(hass):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
-    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["type"] == data_entry_flow.FlowResultType.MENU
     assert result["step_id"] == "discovery_none"
 
 
@@ -119,7 +119,7 @@ async def test_discovery_none_retry_reruns_discovery(hass):
     with patch("custom_components.dlight.config_flow.discover_devices", return_value=mock_devices):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
-            {"next_action": "retry"},
+            {"next_step_id": "retry"},
         )
     assert result["type"] == data_entry_flow.FlowResultType.FORM
     assert result["step_id"] == "discovery"
@@ -136,9 +136,9 @@ async def test_discovery_none_retry_still_empty_shows_interstitial_again(hass):
     with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
-            {"next_action": "retry"},
+            {"next_step_id": "retry"},
         )
-    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["type"] == data_entry_flow.FlowResultType.MENU
     assert result["step_id"] == "discovery_none"
 
 
@@ -164,7 +164,7 @@ async def test_discovery_heals_changed_ip(hass):
         await hass.async_block_till_done()
 
     # The healed lamp is not offered again; with nothing new the flow shows discovery_none
-    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["type"] == data_entry_flow.FlowResultType.MENU
     assert result["step_id"] == "discovery_none"
     # ...but its stored IP has been refreshed
     assert entry.data[CONF_IP_ADDRESS] == "192.168.1.99"
@@ -188,7 +188,7 @@ async def test_manual_readd_updates_ip(hass):
     # Advance past the discovery_none interstitial
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
-        {"next_action": "manual"},
+        {"next_step_id": "manual"},
     )
     assert result["step_id"] == "manual"
 

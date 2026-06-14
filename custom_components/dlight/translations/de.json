@@ -8,17 +8,6 @@
                     "selected_device": "Gerät"
                 }
             },
-            "discovery_none": {
-                "title": "Keine dLight-Lampen gefunden",
-                "description": "Dein Netzwerk blockiert möglicherweise UDP-Broadcasts. Du kannst die IP-Adresse deiner Lampe manuell eingeben oder überprüfen, ob die Lampe eingeschaltet und im selben Netzwerksegment ist.",
-                "data": {
-                    "next_action": "Was möchtest du tun?"
-                },
-                "menu_options": {
-                    "manual": "IP manuell eingeben",
-                    "retry": "Erneut versuchen"
-                }
-            },
             "manual": {
                 "title": "dLight manuell hinzufügen",
                 "data": {

@@ -8,17 +8,6 @@
                     "selected_device": "デバイス"
                 }
             },
-            "discovery_none": {
-                "title": "dLightランプが見つかりませんでした",
-                "description": "ネットワークがUDPブロードキャストをブロックしている可能性があります。ランプのIPアドレスを手動で入力するか、ランプの電源が入っており同じネットワークセグメントにあるか確認してください。",
-                "data": {
-                    "next_action": "どうしますか？"
-                },
-                "menu_options": {
-                    "manual": "IPを手動で入力",
-                    "retry": "再試行"
-                }
-            },
             "manual": {
                 "title": "dLightを手動で追加",
                 "data": {

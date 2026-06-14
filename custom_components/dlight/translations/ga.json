@@ -8,17 +8,6 @@
                     "selected_device": "Gléas"
                 }
             },
-            "discovery_none": {
-                "title": "Níor aimsíodh aon lampaí dLight",
-                "description": "B'fhéidir go gcoiscíonn do líonra craoltaí UDP. Is féidir leat seoladh IP do lampa a chur isteach de láimh, nó seiceáil go bhfuil an lampa ar siúl agus ar an gcuid chéanna den líonra.",
-                "data": {
-                    "next_action": "Cad ba mhaith leat a dhéanamh?"
-                },
-                "menu_options": {
-                    "manual": "Cuir isteach IP de láimh",
-                    "retry": "Bain triail eile as"
-                }
-            },
             "manual": {
                 "title": "Cuir dLight leis de láimh",
                 "data": {

@@ -4,11 +4,15 @@ Flow map::
 
     user step ──(lamps found)──> discovery step ──(pick a lamp)──┐
         │                              │ ("manual" option)       │
-        └──(none found / error)──> manual step <─────────────────┘
-                                       │
-                          validate_input() probes the lamp
-                                       │
-                                 create entry
+        │                              └──────────────────────── ┤
+        └──(none found / error)──> discovery_none step           │
+                                       │ ("manual" option)       │
+                                       │ ("retry" re-runs user)  │
+                                       └──> manual step <────────┘
+                                                │
+                                   validate_input() probes the lamp
+                                                │
+                                          create entry
 
 Two extra paths keep entries pointing at the right IP after DHCP changes:
 the user step silently heals known lamps rediscovered on a new address, and
@@ -141,7 +145,7 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if self._discovered:
             return await self.async_step_discovery()
-        return await self.async_step_manual()
+        return await self.async_step_discovery_none()
 
     async def async_step_discovery(
         self, user_input: dict[str, Any] | None = None
@@ -171,6 +175,27 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="discovery",
             data_schema=vol.Schema({vol.Required("selected_device"): vol.In(options)}),
+        )
+
+    async def async_step_discovery_none(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Inform the user that no lamps were found and offer next steps."""
+        if user_input is not None:
+            choice = user_input["next_action"]
+            if choice == "retry":
+                return await self.async_step_user()
+            return await self.async_step_manual()
+
+        return self.async_show_form(
+            step_id="discovery_none",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("next_action"): vol.In(
+                        {"manual": "Enter IP manually", "retry": "Try again"}
+                    )
+                }
+            ),
         )
 
     async def async_step_manual(

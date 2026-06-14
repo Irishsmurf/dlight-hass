@@ -8,6 +8,17 @@
                     "selected_device": "Device"
                 }
             },
+            "discovery_none": {
+                "title": "No dLight lamps found",
+                "description": "Your network may block UDP broadcasts. You can enter your lamp's IP address manually, or check that the lamp is powered on and on the same network segment.",
+                "data": {
+                    "next_action": "What would you like to do?"
+                },
+                "menu_options": {
+                    "manual": "Enter IP manually",
+                    "retry": "Try again"
+                }
+            },
             "manual": {
                 "title": "Add a dLight manually",
                 "data": {

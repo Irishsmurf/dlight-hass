@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-06-14
+
 ### Fixed
 - Add missing `discovery_none` translation strings to `strings.json` and all five locale files (`en`, `de`, `fr`, `ga`, `ja`), fixing blank UI when UDP discovery returns zero results (closes #45).
 - Restore separate `FADE_TO_OFF_TARGET_PCT = 1` constant so `_async_start_turn_off_fade` fades to 1% (not 5%), giving full-range step count and proper pacing at low brightness (closes #46).

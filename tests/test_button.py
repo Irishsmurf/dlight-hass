@@ -94,4 +94,16 @@ async def test_identify_suppresses_physical_control_event(
     # Flag must be cleared after press completes.
     assert coordinator.identify_in_progress is False
 
+    # Simulate the post-flash restore poll returning the original state.
+    # This must NOT fire a spurious event even though state differs from
+    # the mid-flash value we set in slow_flash above.
+    mock_dlight_device.get_state.return_value = {
+        "on": True,
+        "brightness": 50,
+        "color": {"temperature": 4000},
+    }
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert events == [], f"Spurious physical_control events fired after identify completed: {events}"
+
     mock_dlight_device.flash = original_flash

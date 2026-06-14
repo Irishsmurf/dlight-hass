@@ -652,6 +652,12 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             # refresh on completion.
             _LOGGER.debug("dLight %s: poll rejected (fade in progress)", self.device.id)
             return
+        if self.coordinator.identify_in_progress:
+            # Reject mid-flash polls entirely so _last_confirmed_data is not
+            # poisoned with a transient state; otherwise the post-flash restore
+            # poll would look like an external change and fire a spurious event.
+            _LOGGER.debug("dLight %s: poll rejected (identify in progress)", self.device.id)
+            return
 
         within_hold = (
             self._optimistic_on is not None
@@ -695,7 +701,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             _LOGGER.debug("dLight %s: poll accepted (confirmed HA command)", self.device.id)
         else:
             # Outside the hold window: any change was driven externally.
-            if self._last_confirmed_data is not None and not self.coordinator.identify_in_progress:
+            if self._last_confirmed_data is not None:
                 _LOGGER.debug(
                     "dLight %s: physical control detected (outside hold window)", self.device.id
                 )

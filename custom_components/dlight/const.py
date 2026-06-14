@@ -26,3 +26,7 @@ REDISCOVERY_FAILURE_THRESHOLD = 3
 
 # How long a rediscovery sweep listens for UDP answers, in seconds.
 REDISCOVERY_DURATION = 2.0
+
+# Lamps are unreliable (flicker, brief power-cycle) below this brightness.
+# Applied as a floor to all turn_on and fade-step commands; turn_off is exempt.
+MIN_BRIGHTNESS_PCT = 5

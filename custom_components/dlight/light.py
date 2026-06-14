@@ -48,7 +48,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, KELVIN_MAX, KELVIN_MIN, POLL_INTERVAL
+from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, KELVIN_MAX, KELVIN_MIN, MIN_BRIGHTNESS_PCT, POLL_INTERVAL
 from .coordinator import DLightCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,9 +63,6 @@ PARALLEL_UPDATES = 1
 # into command floods (the interval stretches instead).
 TRANSITION_STEP_INTERVAL = 0.5
 TRANSITION_MAX_STEPS = 60
-# Fade-to-off bottoms out here before the actual power-off command: 0% via
-# set_brightness is indistinguishable from "off" and would end the fade early.
-TRANSITION_MIN_OFF_PCT = 1
 
 
 def _to_ha_brightness(percent: int) -> int:
@@ -75,6 +72,11 @@ def _to_ha_brightness(percent: int) -> int:
     brightness must stay non-zero in HA (1% -> 3, never 0 = "off").
     """
     return math.ceil(percent / 100 * 255)
+
+
+def _apply_brightness_floor(pct: int) -> int:
+    """Clamp a device-percent brightness to MIN_BRIGHTNESS_PCT."""
+    return max(pct, MIN_BRIGHTNESS_PCT)
 
 
 def _to_dlight_brightness(brightness: int) -> int:
@@ -263,6 +265,11 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         if brightness is not None and _to_dlight_brightness(brightness) == 0:
             await self.async_turn_off(**kwargs)
             return
+
+        # Clamp to the minimum safe brightness floor (device-percent level).
+        if brightness is not None:
+            clamped_pct = max(_to_dlight_brightness(brightness), MIN_BRIGHTNESS_PCT)
+            brightness = math.floor(clamped_pct / 100 * 255)
 
         # The newest command always wins over a fade already in flight.
         await self._async_cancel_transition()
@@ -478,11 +485,11 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         already at minimum) so the caller sends a plain power-off instead.
         """
         start_pct = self._current_pct()
-        if not self.is_on or start_pct is None or start_pct <= TRANSITION_MIN_OFF_PCT:
+        if not self.is_on or start_pct is None or start_pct <= MIN_BRIGHTNESS_PCT:
             return False
 
         steps, interval = self._fade_plan(
-            start_pct, TRANSITION_MIN_OFF_PCT, None, None, transition
+            start_pct, MIN_BRIGHTNESS_PCT, None, None, transition
         )
         self._transition_task = self.hass.async_create_task(
             self._async_run_fade(steps, interval, turn_off_after=True)
@@ -540,6 +547,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                 )
                 commands = []
                 if pct is not None:
+                    pct = _apply_brightness_floor(pct)
                     commands.append(self.device.set_brightness(pct))
                 if kelvin is not None:
                     commands.append(self.device.set_color_temperature(kelvin))

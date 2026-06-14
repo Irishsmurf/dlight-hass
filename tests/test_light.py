@@ -1,4 +1,5 @@
 import asyncio
+import math
 
 import pytest
 from unittest.mock import patch
@@ -317,12 +318,13 @@ async def test_light_turn_off_with_transition(
     )
     await hass.async_block_till_done()
 
-    # From 50% in 2 steps: an intermediate dim, then the 1% floor, then off.
+    # From 50% in 2 steps: an intermediate dim, then the MIN_BRIGHTNESS_PCT floor, then off.
+    from custom_components.dlight.const import MIN_BRIGHTNESS_PCT
     brightness_calls = [
         c.args[0] for c in mock_dlight_device.set_brightness.call_args_list
     ]
-    assert brightness_calls[-1] == 1
-    assert all(0 < b < 50 for b in brightness_calls)
+    assert brightness_calls[-1] == MIN_BRIGHTNESS_PCT
+    assert all(0 < b <= 50 for b in brightness_calls)
     mock_dlight_device.turn_off.assert_called_once()
     assert hass.states.get("light.test_light").state == "off"
 
@@ -951,3 +953,47 @@ async def test_physical_control_not_fired_during_transition(
 
     # Cleanup: cancel the fade so the test doesn't block for 20 real seconds.
     await entity._async_cancel_transition()
+
+
+# --- Minimum brightness floor ---
+
+async def test_turn_on_brightness_below_floor_is_clamped(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """turn_on with brightness=1 must send MIN_BRIGHTNESS_PCT to the device."""
+    from custom_components.dlight.const import MIN_BRIGHTNESS_PCT
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "brightness": 1},
+        blocking=True,
+    )
+
+    # brightness=1 on HA scale is ceil(1/255*100)=1% device → clamped to MIN_BRIGHTNESS_PCT
+    mock_dlight_device.set_brightness.assert_called_with(MIN_BRIGHTNESS_PCT)
+    # State reflects the clamped floor: device returns 5% → _to_ha_brightness(5) = ceil(12.75) = 13
+    state = hass.states.get("light.test_light")
+    assert state.attributes.get("brightness") == math.ceil(MIN_BRIGHTNESS_PCT / 100 * 255)
+
+
+async def test_turn_off_ignores_brightness_floor(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """turn_off must send the power-off command regardless of the floor."""
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        LIGHT_DOMAIN, "turn_off", {"entity_id": "light.test_light"}, blocking=True
+    )
+
+    mock_dlight_device.turn_off.assert_called_once()
+    mock_dlight_device.set_brightness.assert_not_called()
+    assert hass.states.get("light.test_light").state == "off"

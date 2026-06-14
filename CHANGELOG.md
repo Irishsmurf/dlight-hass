@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-06-14
+
 ### Added
 - Use `DLightDevice.apply_scene()` to atomically apply brightness and color temperature in a single TCP command when both are set together, reducing connection overhead and enabling atomic rollback on failure.
 - Fire a `dlight_physical_control` HA event when a poll detects a state change that was not initiated by Home Assistant, enabling automations that respond to physical button presses or external control.

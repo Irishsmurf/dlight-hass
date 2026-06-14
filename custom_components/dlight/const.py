@@ -30,3 +30,8 @@ REDISCOVERY_DURATION = 2.0
 # Lamps are unreliable (flicker, brief power-cycle) below this brightness.
 # Applied as a floor to all turn_on and fade-step commands; turn_off is exempt.
 MIN_BRIGHTNESS_PCT = 5
+
+# Bottom of the fade-to-off curve. 0% via set_brightness is indistinguishable
+# from off and would end the fade early, so we fade to 1% then cut power.
+# Kept separate from MIN_BRIGHTNESS_PCT to avoid collapsing the fade range.
+FADE_TO_OFF_TARGET_PCT = 1

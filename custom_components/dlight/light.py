@@ -48,7 +48,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, KELVIN_MAX, KELVIN_MIN, MIN_BRIGHTNESS_PCT, POLL_INTERVAL
+from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, FADE_TO_OFF_TARGET_PCT, KELVIN_MAX, KELVIN_MIN, MIN_BRIGHTNESS_PCT, POLL_INTERVAL
 from .coordinator import DLightCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -489,7 +489,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             return False
 
         steps, interval = self._fade_plan(
-            start_pct, MIN_BRIGHTNESS_PCT, None, None, transition
+            start_pct, FADE_TO_OFF_TARGET_PCT, None, None, transition
         )
         self._transition_task = self.hass.async_create_task(
             self._async_run_fade(steps, interval, turn_off_after=True)

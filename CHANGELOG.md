@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-06-14
+
 ### Added
 - Add `sensor` platform with two diagnostic entities per lamp: **Brightness** (%, unique id `dlight_{id}_brightness`) and **Color Temperature** (K, unique id `dlight_{id}_color_temp`), both backed by the existing coordinator poll with no extra network traffic (closes #64).
 - Migrate config flow `async_step_user` and `async_step_retry` from blocking `discover_devices()` to streaming `discover_devices_stream()`; a lamp that answers immediately now resolves the pick-list without waiting the full 2-second discovery window (closes #63).

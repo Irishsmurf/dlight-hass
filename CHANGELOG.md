@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace misleading `rediscovery_triggered` binary sensor attribute with `rediscovery_in_progress` backed by a real task-liveness check on the coordinator (closes #47).
 - Add `identify_in_progress` flag to coordinator; set in `button.py` `async_press` via try/finally and checked in `light.py` `_handle_coordinator_update` to suppress spurious `dlight_physical_control` events when a coordinator poll lands mid-flash (closes #51).
 - Replace `math.floor` with `_to_ha_brightness` when clamping `_optimistic_brightness` in `async_turn_on`, and use `clamped_pct` directly in device commands to avoid a lossy HA→device→HA round-trip; fix the rapid-fire guard comparison to compare in HA scale so clamped-floor polls are correctly accepted (closes #48).
+- Clamp `start_pct` to `MIN_BRIGHTNESS_PCT` before computing the interpolation plan in `_async_start_turn_on_fade`, eliminating the visual stutter when fading up from a sub-floor brightness set by an external client (closes #49).
 
 ### Added
 - Add structured debug logging across `coordinator.py` (poll start/success/failure, rediscovery), `light.py` (turn-on/off/toggle params, optimistic state, fade step-by-step, poll-guard decisions), and `config_flow.py` (discovery result count, known-lamp self-heal, DHCP step trigger).

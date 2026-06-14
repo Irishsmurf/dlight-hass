@@ -1055,3 +1055,52 @@ async def test_turn_off_fade_from_low_brightness_uses_fade_to_off_target(
     # Power-off must follow the fade.
     mock_dlight_device.turn_off.assert_called_once()
     assert hass.states.get("light.test_light").state == "off"
+
+
+async def test_fade_up_from_subfloor_brightness_anchors_start(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """Fading up from below MIN_BRIGHTNESS_PCT must not stutter on the first step.
+
+    Regression for #49: _async_start_turn_on_fade must clamp start_pct to
+    MIN_BRIGHTNESS_PCT before computing the fade plan.  Without the fix, early
+    interpolated steps (e.g. 3%, 4%) are all floored to 5% in _async_run_fade,
+    producing a burst of identical set_brightness(5) calls before the smooth fade
+    begins.
+    """
+    from custom_components.dlight.const import MIN_BRIGHTNESS_PCT
+
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data
+
+    # Simulate the lamp being set to 2% by an external client (below the floor).
+    mock_dlight_device.get_state.return_value = {
+        "on": True,
+        "brightness": 2,
+        "color": {"temperature": 4000},
+    }
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    # Fade to 7% over 1s (2 steps): with start anchored at 5%, first step
+    # interpolates to 6%; without the fix it would jump to 5% (the floor).
+    # HA brightness 17 -> _to_dlight_brightness(17) = ceil(6.67) = 7 -> target_pct=7.
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "brightness": 17, "transition": 1},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    brightness_calls = [c.args[0] for c in mock_dlight_device.set_brightness.call_args_list]
+    # With fix: start is anchored to 5, fade plan is [6, 7] — no stutter.
+    # Without fix: first step would be set_brightness(5) (the floor value).
+    assert brightness_calls, "No set_brightness calls — fade did not run"
+    assert brightness_calls[0] > MIN_BRIGHTNESS_PCT, (
+        f"Fade stuttered to floor on first step: calls={brightness_calls}"
+    )

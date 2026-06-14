@@ -36,6 +36,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
     # Register close before the first refresh so the connection is always
     # cleaned up — even if async_config_entry_first_refresh raises
     # ConfigEntryNotReady and HA fires the unload hooks during retry teardown.
+    # HA's _async_process_on_unload schedules any returned coroutine as a task,
+    # so passing client.close (an async method) directly is correct.
     entry.async_on_unload(client.close)
 
     device = DLightDevice(ip_address=ip_address, device_id=device_id, client=client)

@@ -997,3 +997,61 @@ async def test_turn_off_ignores_brightness_floor(
     mock_dlight_device.turn_off.assert_called_once()
     mock_dlight_device.set_brightness.assert_not_called()
     assert hass.states.get("light.test_light").state == "off"
+
+
+async def test_turn_off_fade_from_low_brightness_uses_fade_to_off_target(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """turn_off with transition from low brightness uses FADE_TO_OFF_TARGET_PCT for fade plan.
+
+    Regression for #46: using MIN_BRIGHTNESS_PCT (5%) as both the guard and the
+    fade target collapsed the 10%→5% range to far fewer interpolated steps than
+    the full 10%→1% range, producing coarse pacing at low brightness.
+
+    _apply_brightness_floor still clamps the sent values to MIN_BRIGHTNESS_PCT,
+    but the fade plan covers the wider range so the step count (and thus pacing)
+    is proportional to the full 10%→1% span, not just 10%→5%.
+    """
+    from custom_components.dlight.const import FADE_TO_OFF_TARGET_PCT, MIN_BRIGHTNESS_PCT
+
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Lamp is at 10% — above the guard (>5%) but low enough that the old bug
+    # collapsed the usable fade range.
+    mock_dlight_device.get_state.return_value = {
+        "on": True,
+        "brightness": 10,
+        "color": {"temperature": 4000},
+    }
+    await hass.async_block_till_done()
+
+    # Ensure the coordinator picks up the 10% state.
+    entry = hass.config_entries.async_entries("dlight")[0]
+    coordinator = entry.runtime_data
+    await coordinator.async_refresh()
+
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_off",
+        {"entity_id": "light.test_light", "transition": 5},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    brightness_calls = [
+        c.args[0] for c in mock_dlight_device.set_brightness.call_args_list
+    ]
+
+    # The fade plan covers 10%→1% but _apply_brightness_floor clamps sub-floor
+    # steps to 5%.  After deduplication in _async_start_turn_off_fade the
+    # redundant floor-clamped commands are removed, leaving exactly [9, 8, 7, 6, 5].
+    assert brightness_calls == [9, 8, 7, 6, 5], (
+        f"Expected exactly [9, 8, 7, 6, 5] brightness commands, got {brightness_calls}"
+    )
+
+    # Power-off must follow the fade.
+    mock_dlight_device.turn_off.assert_called_once()
+    assert hass.states.get("light.test_light").state == "off"

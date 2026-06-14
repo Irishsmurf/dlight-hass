@@ -48,7 +48,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, KELVIN_MAX, KELVIN_MIN, MIN_BRIGHTNESS_PCT, POLL_INTERVAL
+from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, FADE_TO_OFF_TARGET_PCT, KELVIN_MAX, KELVIN_MIN, MIN_BRIGHTNESS_PCT, POLL_INTERVAL
 from .coordinator import DLightCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -489,10 +489,23 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             return False
 
         steps, interval = self._fade_plan(
-            start_pct, MIN_BRIGHTNESS_PCT, None, None, transition
+            start_pct, FADE_TO_OFF_TARGET_PCT, None, None, transition
         )
+        # Deduplicate steps after the brightness floor so the lamp never receives
+        # repeated set_brightness(MIN_BRIGHTNESS_PCT) calls for sub-floor interpolation
+        # points.  The sleep intervals are kept; only the redundant commands are dropped.
+        deduped: list[tuple[int | None, int | None]] = []
+        last_clamped: int | None = None
+        for pct, kelvin in steps:
+            if pct is not None:
+                clamped = max(pct, MIN_BRIGHTNESS_PCT)
+                if clamped == last_clamped:
+                    pct = None
+                else:
+                    last_clamped = clamped
+            deduped.append((pct, kelvin))
         self._transition_task = self.hass.async_create_task(
-            self._async_run_fade(steps, interval, turn_off_after=True)
+            self._async_run_fade(deduped, interval, turn_off_after=True)
         )
         return True
 

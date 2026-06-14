@@ -8,10 +8,18 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.dlight.const import DOMAIN, CONF_DEVICE_ID
 
+
+def _mock_stream(devices):
+    """Return an async generator function that yields the given device dicts."""
+    async def _gen(**kwargs):
+        for d in devices:
+            yield d
+    return _gen
+
 async def test_flow_user_manual(hass):
     """Test manual entry flow via the discovery_none step."""
     # With no devices discovered, the flow shows the discovery_none interstitial
-    with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream([])):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
@@ -53,7 +61,7 @@ async def test_flow_discovery(hass):
         {"deviceId": "discovered_id", "ip_address": "192.168.1.50", "deviceModel": "Smart dLight"}
     ]
     
-    with patch("custom_components.dlight.config_flow.discover_devices", return_value=mock_devices):
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream(mock_devices)):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
@@ -81,7 +89,7 @@ async def test_flow_discovery(hass):
 async def test_flow_manual_from_discovery(hass):
     """Test selecting manual entry from discovery list."""
     mock_devices = [{"deviceId": "id", "ip_address": "1.1.1.1"}]
-    with patch("custom_components.dlight.config_flow.discover_devices", return_value=mock_devices):
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream(mock_devices)):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
@@ -94,9 +102,26 @@ async def test_flow_manual_from_discovery(hass):
     assert result["type"] == data_entry_flow.FlowResultType.FORM
     assert result["step_id"] == "manual"
 
+async def test_discovery_resolves_instantly_when_lamp_responds(hass):
+    """A lamp that answers immediately completes discovery without a 2-second wait.
+
+    The mock stream yields a device and then closes — simulating a fast-responding
+    lamp. The flow must reach the discovery step without blocking on a fixed timeout.
+    """
+    mock_devices = [
+        {"deviceId": "instant_id", "ip_address": "192.168.1.11", "deviceModel": "dLight"}
+    ]
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream(mock_devices)):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "discovery"
+
+
 async def test_discovery_none_shows_interstitial(hass):
     """When discovery returns no results, the flow shows the discovery_none step."""
-    with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream([])):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
@@ -109,14 +134,14 @@ async def test_discovery_none_retry_reruns_discovery(hass):
     mock_devices = [
         {"deviceId": "lamp_id", "ip_address": "192.168.1.55", "deviceModel": "dLight"}
     ]
-    with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream([])):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
     assert result["step_id"] == "discovery_none"
 
     # Retry: this time discovery finds a lamp
-    with patch("custom_components.dlight.config_flow.discover_devices", return_value=mock_devices):
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream(mock_devices)):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"next_step_id": "retry"},
@@ -127,13 +152,13 @@ async def test_discovery_none_retry_reruns_discovery(hass):
 
 async def test_discovery_none_retry_still_empty_shows_interstitial_again(hass):
     """Retrying when discovery still finds nothing shows discovery_none again."""
-    with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream([])):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
     assert result["step_id"] == "discovery_none"
 
-    with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream([])):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {"next_step_id": "retry"},
@@ -156,7 +181,7 @@ async def test_discovery_heals_changed_ip(hass):
     mock_devices = [
         {"deviceId": "known_id", "ip_address": "192.168.1.99", "deviceModel": "dLight"}
     ]
-    with patch("custom_components.dlight.config_flow.discover_devices", return_value=mock_devices), \
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream(mock_devices)), \
          patch("custom_components.dlight.async_setup_entry", return_value=True):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -186,7 +211,7 @@ async def test_retry_does_not_heal_known_lamp_ip(hass):
     entry.add_to_hass(hass)
 
     # First init: no devices found → discovery_none
-    with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream([])):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
@@ -196,7 +221,7 @@ async def test_retry_does_not_heal_known_lamp_ip(hass):
     mock_devices = [
         {"deviceId": "known_id", "ip_address": "192.168.1.99", "deviceModel": "dLight"}
     ]
-    with patch("custom_components.dlight.config_flow.discover_devices", return_value=mock_devices), \
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream(mock_devices)), \
          patch.object(hass.config_entries, "async_update_entry") as mock_update, \
          patch.object(hass.config_entries, "async_schedule_reload") as mock_reload:
         result = await hass.config_entries.flow.async_configure(
@@ -225,7 +250,7 @@ async def test_manual_readd_updates_ip(hass):
     )
     entry.add_to_hass(hass)
 
-    with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
+    with patch("custom_components.dlight.config_flow.discover_devices_stream", _mock_stream([])):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )

@@ -186,6 +186,11 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         # physical changes between polls. None until the first poll is accepted.
         self._last_confirmed_data: dict | None = None
 
+        # Set to True when an emulated fade fails mid-run; cleared by the next
+        # _handle_coordinator_update call to suppress a spurious physical_control
+        # event that would otherwise fire because optimistic state was just cleared.
+        self._fade_failed: bool = False
+
         # The registry card is built once: coordinator.info is static
         # (fetched a single time at setup, see DLightCoordinator).
         device_info = DeviceInfo(
@@ -565,6 +570,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             interval,
             turn_off_after,
         )
+        self._last_command_time = time.monotonic()
         try:
             for index, (pct, kelvin) in enumerate(steps):
                 if index:
@@ -609,6 +615,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                 self.device.id,
                 exc_info=True,
             )
+            self._fade_failed = True
             self._clear_optimistic_state()
             self.async_write_ha_state()
 
@@ -676,6 +683,16 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             # poisoned with a transient state; otherwise the post-flash restore
             # poll would look like an external change and fire a spurious event.
             _LOGGER.debug("dLight %s: poll rejected (identify in progress)", self.device.id)
+            return
+        if self._fade_failed:
+            # A fade that failed mid-run already cleared optimistic state, so
+            # within_hold would be False and a spurious physical_control event
+            # would fire.  Accept the poll silently instead.
+            _LOGGER.debug("dLight %s: poll accepted after failed fade", self.device.id)
+            self._fade_failed = False
+            self._last_confirmed_data = self.coordinator.data
+            self._clear_optimistic_state()
+            super()._handle_coordinator_update()
             return
 
         within_hold = (

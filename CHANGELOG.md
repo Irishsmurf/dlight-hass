@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Redact `macAddress` in diagnostics download by adding it to `TO_REDACT` and passing `coordinator.info` through `async_redact_data` (closes #59).
 - Log all exceptions from a failed `_send()` batch before re-raising the first, so compound device failures (e.g. simultaneous `turn_on` + `set_brightness` errors) are fully visible in the HA log (closes #60).
+- Suppress spurious `dlight_physical_control` event after a failed emulated transition by stamping `_last_command_time` at fade start and short-circuiting `_handle_coordinator_update` via a `_fade_failed` guard (closes #61).
 
 ## [2.3.2] - 2026-06-14
 

@@ -10,7 +10,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE
+from homeassistant.const import PERCENTAGE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -20,8 +20,6 @@ from .const import DOMAIN
 from .coordinator import DLightCoordinator
 
 PARALLEL_UPDATES = 0
-
-_UNIT_KELVIN = "K"
 
 
 async def async_setup_entry(

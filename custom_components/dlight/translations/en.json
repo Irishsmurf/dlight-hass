@@ -21,6 +21,14 @@
                     "name": "Optional friendly name. Defaults to the device model."
                 }
             },
+            "discovery_none": {
+                "title": "No lamps found",
+                "description": "No dLight lamps responded to the UDP discovery broadcast. This usually means broadcast traffic is filtered on your network. You can enter the lamp's IP address manually, or try scanning again.",
+                "menu_options": {
+                    "manual": "Enter IP address manually",
+                    "retry": "Try again"
+                }
+            },
             "reconfigure": {
                 "title": "Reconfigure dLight",
                 "description": "Update the connection details for this lamp.",

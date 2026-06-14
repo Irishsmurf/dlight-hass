@@ -69,3 +69,7 @@ The coordinator polls each lamp every **30 seconds** (`force_update=True`, bypas
 ## Diagnostics export
 
 Each device offers a redacted **diagnostics** download for bug reports — IP address and device ID are scrubbed automatically. See [Diagnostics & Bug Reports](diagnostics.md).
+
+## Having trouble?
+
+See the [Troubleshooting guide](troubleshooting.md) for help with discovery failures, unavailable lights, stale state, and filing bug reports.

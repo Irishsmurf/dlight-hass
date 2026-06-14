@@ -50,6 +50,19 @@ The light goes unavailable when a poll fails. This is usually transient (a dropp
 - Look at the **Connectivity** binary sensor; it stays available and reports *disconnected*, confirming the integration sees the lamp as unreachable.
 - If the lamp's **IP changed**, the integration's [self-healing](../getting-started/configuration.md#ip-self-healing) should recover it within a few poll intervals via a rediscovery sweep. To force it, re-run **Add Integration** or use **Reconfigure**.
 
+### Reading the Connectivity sensor attributes
+
+The **Connectivity** binary sensor exposes health metrics in its state attributes. In **Developer Tools → States**, look for `binary_sensor.{name}_connectivity`:
+
+| Attribute | What it tells you |
+|---|---|
+| `consecutive_failures` | How many polls have failed in a row. Resets to `0` on success. |
+| `last_successful_poll` | Timestamp of the last poll that got a response. `None` until the first success. |
+| `rediscovery_triggered` | `true` after 3 consecutive failures — a UDP rediscovery sweep is in flight. |
+| `poll_interval_seconds` | How frequently the lamp is polled (default 30 s). |
+
+A lamp that's been offline for 3 polls (~90 s) automatically triggers a rediscovery sweep. If it answers from a new IP, the entry is updated and the coordinator resumes without any manual steps.
+
 ## A lamp's IP changed and didn't recover
 
 Self-healing covers most cases automatically. To recover manually:
@@ -63,6 +76,12 @@ To make IPs stable in the first place, set a **DHCP reservation** for each lamp'
 
 - The UI updates optimistically and reconciles on the next poll (default **30 s**). A brief settle is normal.
 - Rapid slider drags are protected by a rapid-fire guard so they shouldn't revert mid-interaction. If you see persistent snap-backs, capture [diagnostics](diagnostics.md) and open an issue.
+
+## Physical button presses don't trigger automations fast enough
+
+State changes from physical buttons are only detected on the next poll (up to 30 s later). If you need instant reaction, use the **`dlight_physical_control`** event instead of a state trigger — it fires the moment the next poll detects a change.
+
+See [Physical Control Event](physical-control-event.md) for event payload details and automation examples.
 
 ## Transitions look choppy
 
@@ -80,4 +99,5 @@ Transitions are [emulated](transitions.md), not hardware ramps — they're a seq
        custom_components.dlight: debug
        dlightclient: debug
    ```
-4. Open an issue on [GitHub](https://github.com/Irishsmurf/dlight-hass/issues) with the diagnostics, logs, and your Home Assistant version.
+4. If you can reproduce the issue reliably, consider running [`tests/fake_lamp.py`](https://github.com/Irishsmurf/dlight-hass/blob/main/tests/fake_lamp.py) — a simulated lamp with injectable delays, resets, and hangs — to capture the exact behaviour without involving a physical device.
+5. Open an issue on [GitHub](https://github.com/Irishsmurf/dlight-hass/issues) with the diagnostics, logs, your Home Assistant version, and the `dlight-client` version shown in **Settings → System → Repairs** or `pip show dlight-client`.

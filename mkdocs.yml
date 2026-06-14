@@ -98,6 +98,7 @@ nav:
   - User Guide:
       - Features: user-guide/features.md
       - Transitions: user-guide/transitions.md
+      - Physical Control Event: user-guide/physical-control-event.md
       - Troubleshooting: user-guide/troubleshooting.md
       - Diagnostics & Bug Reports: user-guide/diagnostics.md
   - Architecture:

@@ -41,6 +41,7 @@
 - **Feels instant** — optimistic state updates the UI immediately; a confirmed poll reconciles it.
 - **Emulated transitions** — smooth fades despite the protocol having no native fade.
 - **IP self-healing** — recovers from DHCP address changes via the DHCP watcher, a runtime discovery sweep, or re-running setup.
+- **Physical control detection** — fires a [`dlight_physical_control`](https://irishsmurf.github.io/dlight-hass/user-guide/physical-control-event/) event when external button presses or third-party app changes are detected; also exposes a Physical Control entity in the device UI.
 - **Diagnostics** — download a sanitized snapshot (IP and device ID redacted) for bug reports.
 - **Reconfigure support** — update a lamp's connection details from the UI.
 - **Localized** — English, German, French, Japanese, and Irish.

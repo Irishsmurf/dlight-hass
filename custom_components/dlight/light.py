@@ -251,6 +251,14 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         kelvin: int | None = kwargs.get(ATTR_COLOR_TEMP_KELVIN)
         transition: float | None = kwargs.get(ATTR_TRANSITION)
 
+        _LOGGER.debug(
+            "%s: turn_on brightness=%s kelvin=%s transition=%s",
+            self.entity_id,
+            brightness,
+            kelvin,
+            transition,
+        )
+
         # HA convention: turn_on with brightness 0 actually means "turn off".
         if brightness is not None and _to_dlight_brightness(brightness) == 0:
             await self.async_turn_off(**kwargs)
@@ -282,6 +290,12 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         )
         if self._optimistic_kelvin is None:
             self._optimistic_kelvin = KELVIN_MIN  # unknown -> assume warm
+        _LOGGER.debug(
+            "%s: optimistic state set on=True brightness=%s kelvin=%s",
+            self.entity_id,
+            self._optimistic_brightness,
+            self._optimistic_kelvin,
+        )
         self.async_write_ha_state()
 
         # When both brightness and temperature are set atomically, apply_scene
@@ -333,6 +347,8 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         """
         transition: float | None = kwargs.get(ATTR_TRANSITION)
 
+        _LOGGER.debug("%s: turn_off transition=%s", self.entity_id, transition)
+
         await self._async_cancel_transition()
 
         if (
@@ -367,6 +383,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
     async def async_toggle(self, **kwargs: Any) -> None:
         """Toggle the light using the device's native toggle command."""
+        _LOGGER.debug("%s: toggle (currently on=%s)", self.entity_id, self.is_on)
         await self._async_cancel_transition()
         # Update optimistic state
         self._last_command_time = time.monotonic()
@@ -502,10 +519,25 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         there is no service call left to deliver it to. A refresh afterwards
         reconciles whatever the lamp actually reached.
         """
+        _LOGGER.debug(
+            "dLight %s: fade starting (%d steps, interval=%.2fs, turn_off_after=%s)",
+            self.device.id,
+            len(steps),
+            interval,
+            turn_off_after,
+        )
         try:
             for index, (pct, kelvin) in enumerate(steps):
                 if index:
                     await asyncio.sleep(interval)
+                _LOGGER.debug(
+                    "dLight %s: fade step %d/%d pct=%s kelvin=%s",
+                    self.device.id,
+                    index + 1,
+                    len(steps),
+                    pct,
+                    kelvin,
+                )
                 commands = []
                 if pct is not None:
                     commands.append(self.device.set_brightness(pct))
@@ -597,6 +629,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             # Mid-fade a poll is already stale: it would snap the UI back to
             # wherever the lamp was when polled. The fade requests its own
             # refresh on completion.
+            _LOGGER.debug("dLight %s: poll rejected (fade in progress)", self.device.id)
             return
 
         within_hold = (
@@ -633,11 +666,18 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                 # Within the hold window and state doesn't match: ignore
                 # this poll to prevent the UI from snapping back to a stale
                 # value during rapid-fire interactions.
+                _LOGGER.debug(
+                    "dLight %s: poll rejected (stale within hold window)", self.device.id
+                )
                 return
             # Matching poll confirms the HA command — fall through to update.
+            _LOGGER.debug("dLight %s: poll accepted (confirmed HA command)", self.device.id)
         else:
             # Outside the hold window: any change was driven externally.
             if self._last_confirmed_data is not None:
+                _LOGGER.debug(
+                    "dLight %s: physical control detected (outside hold window)", self.device.id
+                )
                 self._fire_physical_control_event(
                     self._last_confirmed_data, self.coordinator.data
                 )

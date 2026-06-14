@@ -94,6 +94,7 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         Failure is tolerated: the info payload is cosmetic (device registry
         card), and a lamp that can't answer get_info may still control fine.
         """
+        _LOGGER.debug("dLight %s: fetching static device info", self.device.id)
         try:
             ping_ok = await self.device.ping(timeout=2.0)
         except Exception:  # noqa: BLE001 — defensively catch any errors in ping
@@ -123,6 +124,12 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 key: info.get(key)
                 for key in ("swVersion", "hwVersion", "deviceModel", "macAddress")
             }
+            _LOGGER.debug(
+                "dLight %s: device info fetched (model=%s sw=%s)",
+                self.device.id,
+                self.info.get("deviceModel"),
+                self.info.get("swVersion"),
+            )
         else:
             _LOGGER.warning(
                 "Device info query for %s returned no usable data: %s",
@@ -132,6 +139,7 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Poll the lamp's current state; any failure marks it unavailable."""
+        _LOGGER.debug("dLight %s: polling state (failures=%d)", self.device.id, self._consecutive_failures)
         try:
             async with asyncio.timeout(POLL_TIMEOUT):
                 # force_update bypasses DLightDevice's local state cache.
@@ -142,9 +150,11 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 state = await self.device.get_state(force_update=True)
         except TimeoutError as err:
             self._note_poll_failure()
+            _LOGGER.debug("dLight %s: poll timed out (consecutive_failures=%d)", self.device.id, self._consecutive_failures)
             raise UpdateFailed(f"Timeout polling dLight {self.device.id}") from err
         except DLightError as err:
             self._note_poll_failure()
+            _LOGGER.debug("dLight %s: poll error (consecutive_failures=%d): %s", self.device.id, self._consecutive_failures, err)
             raise UpdateFailed(
                 f"Error polling dLight {self.device.id}: {err}"
             ) from err
@@ -155,6 +165,7 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 f"Invalid state payload from dLight {self.device.id}: {state!r}"
             )
         self._consecutive_failures = 0
+        _LOGGER.debug("dLight %s: poll success on=%s brightness=%s", self.device.id, state.get("on"), state.get("brightness"))
         return state
 
     def _note_poll_failure(self) -> None:
@@ -165,9 +176,16 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         would otherwise be missed by a single one-shot sweep.
         """
         self._consecutive_failures += 1
+        _LOGGER.debug(
+            "dLight %s: failure count=%d (threshold=%d)",
+            self.device.id,
+            self._consecutive_failures,
+            REDISCOVERY_FAILURE_THRESHOLD,
+        )
         if self._consecutive_failures % REDISCOVERY_FAILURE_THRESHOLD:
             return
         if self._rediscovery_task is not None and not self._rediscovery_task.done():
+            _LOGGER.debug("dLight %s: rediscovery already in flight, skipping", self.device.id)
             return
         # Tracked (not background) task: it is short-lived, and HA then waits
         # for it on shutdown instead of abandoning a half-done entry update.

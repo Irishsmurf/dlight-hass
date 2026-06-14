@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add missing `discovery_none` translation strings to `strings.json` and all five locale files (`en`, `de`, `fr`, `ga`, `ja`), fixing blank UI when UDP discovery returns zero results (closes #45).
 - Restore separate `FADE_TO_OFF_TARGET_PCT = 1` constant so `_async_start_turn_off_fade` fades to 1% (not 5%), giving full-range step count and proper pacing at low brightness (closes #46).
 - Replace misleading `rediscovery_triggered` binary sensor attribute with `rediscovery_in_progress` backed by a real task-liveness check on the coordinator (closes #47).
+- Add `identify_in_progress` flag to coordinator; set in `button.py` `async_press` via try/finally and checked in `light.py` `_handle_coordinator_update` to suppress spurious `dlight_physical_control` events when a coordinator poll lands mid-flash (closes #51).
 
 ### Added
 - Add structured debug logging across `coordinator.py` (poll start/success/failure, rediscovery), `light.py` (turn-on/off/toggle params, optimistic state, fade step-by-step, poll-guard decisions), and `config_flow.py` (discovery result count, known-lamp self-heal, DHCP step trigger).

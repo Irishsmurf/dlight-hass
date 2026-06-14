@@ -65,6 +65,7 @@ class DLightIdentifyButton(CoordinatorEntity[DLightCoordinator], ButtonEntity):
         so the lock spans the entire run, not individual commands.
         """
         device = self.coordinator.device
+        self.coordinator.identify_in_progress = True
         try:
             async with self.coordinator.command_lock:
                 success = await device.flash()
@@ -78,6 +79,8 @@ class DLightIdentifyButton(CoordinatorEntity[DLightCoordinator], ButtonEntity):
                     "error": str(err),
                 },
             ) from err
+        finally:
+            self.coordinator.identify_in_progress = False
         if not success:
             # flash() swallows device errors and reports via its bool result.
             raise HomeAssistantError(

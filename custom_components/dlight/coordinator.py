@@ -69,6 +69,9 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._consecutive_failures = 0
         self._rediscovery_task: asyncio.Task | None = None
         self._last_successful_poll: datetime | None = None
+        # Set to True for the duration of the identify flash sequence so that
+        # a poll landing mid-flash does not fire a spurious physical_control event.
+        self.identify_in_progress: bool = False
 
     @property
     def consecutive_failures(self) -> int:

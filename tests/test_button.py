@@ -46,3 +46,52 @@ async def test_identify_button_failure_raises(hass, mock_dlight_device, mock_con
         await hass.services.async_call(
             "button", "press", {"entity_id": entity_id}, blocking=True
         )
+
+
+async def test_identify_suppresses_physical_control_event(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """A coordinator poll mid-flash must not fire a spurious physical_control event.
+
+    Regression for #51: identify_in_progress flag on the coordinator prevents
+    _handle_coordinator_update from treating mid-flash state as a physical change.
+    """
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.dlight.const import EVENT_PHYSICAL_CONTROL
+
+    await setup_integration(hass, mock_config_entry)
+    coordinator = mock_config_entry.runtime_data
+    events: list = []
+    hass.bus.async_listen(EVENT_PHYSICAL_CONTROL, lambda e: events.append(e))
+
+    # Simulate a slow flash() that lets a poll sneak in mid-sequence.
+    original_flash = mock_dlight_device.flash
+
+    async def slow_flash(*args, **kwargs):
+        # At the start of flash the flag should be True.
+        assert coordinator.identify_in_progress is True
+        # Pretend a poll arrives mid-blink with a different brightness.
+        mock_dlight_device.get_state.return_value = {
+            "on": True,
+            "brightness": 100,
+            "color": {"temperature": 6000},
+        }
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        return True
+
+    mock_dlight_device.flash = AsyncMock(side_effect=slow_flash)
+
+    await hass.services.async_call(
+        "button", "press", {"entity_id": await _get_button_entity_id(hass)}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    # No physical_control event should have fired during the flash sequence.
+    assert events == [], f"Spurious physical_control events fired during identify: {events}"
+    # Flag must be cleared after press completes.
+    assert coordinator.identify_in_progress is False
+
+    mock_dlight_device.flash = original_flash

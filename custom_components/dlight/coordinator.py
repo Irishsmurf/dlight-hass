@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from dlightclient import STATUS_SUCCESS, DLightDevice, DLightError, discover_devices_stream
@@ -17,6 +17,7 @@ from dlightclient.models import DeviceState
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_IP_ADDRESS
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -67,6 +68,7 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # most one UDP sweep in flight at a time.
         self._consecutive_failures = 0
         self._rediscovery_task: asyncio.Task | None = None
+        self._last_successful_poll: datetime | None = None
 
     @callback
     def _handle_device_state_change(
@@ -165,6 +167,7 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 f"Invalid state payload from dLight {self.device.id}: {state!r}"
             )
         self._consecutive_failures = 0
+        self._last_successful_poll = dt_util.utcnow()
         _LOGGER.debug("dLight %s: poll success on=%s brightness=%s", self.device.id, state.get("on"), state.get("brightness"))
         return state
 

@@ -22,3 +22,34 @@ flags:
   binary_sensor:
     paths:
       - custom_components/dlight/binary_sensor.py
+
+component_management:
+  default_rules:
+    statuses:
+      - type: component
+        target: auto
+        threshold: 5%
+  individual_components:
+    - component_id: coordinator
+      name: Coordinator
+      paths:
+        - custom_components/dlight/coordinator.py
+    - component_id: config_flow
+      name: Config Flow
+      paths:
+        - custom_components/dlight/config_flow.py
+    - component_id: light_entity
+      name: Light Entity
+      paths:
+        - custom_components/dlight/light.py
+    - component_id: diagnostics
+      name: Diagnostics
+      paths:
+        - custom_components/dlight/binary_sensor.py
+        - custom_components/dlight/button.py
+        - custom_components/dlight/diagnostics.py
+    - component_id: integration_init
+      name: Integration Init
+      paths:
+        - custom_components/dlight/__init__.py
+        - custom_components/dlight/const.py

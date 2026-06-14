@@ -14,6 +14,7 @@
   <a href="https://github.com/Irishsmurf/dlight-hass/actions/workflows/tests.yaml"><img src="https://github.com/Irishsmurf/dlight-hass/actions/workflows/tests.yaml/badge.svg" alt="Tests"></a>
   <a href="https://github.com/Irishsmurf/dlight-hass/actions/workflows/hassfest.yaml"><img src="https://github.com/Irishsmurf/dlight-hass/actions/workflows/hassfest.yaml/badge.svg" alt="Hassfest"></a>
   <a href="https://github.com/Irishsmurf/dlight-hass/actions/workflows/hacs.yaml"><img src="https://github.com/Irishsmurf/dlight-hass/actions/workflows/hacs.yaml/badge.svg" alt="HACS Action"></a>
+  <a href="https://codecov.io/gh/Irishsmurf/dlight-hass"><img src="https://codecov.io/gh/Irishsmurf/dlight-hass/branch/main/graph/badge.svg" alt="Coverage"></a>
 </p>
 
 ---

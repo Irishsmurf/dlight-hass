@@ -54,6 +54,14 @@
         }
     },
     "entity": {
+        "sensor": {
+            "brightness": {
+                "name": "輝度"
+            },
+            "color_temp": {
+                "name": "色温度"
+            }
+        },
         "event": {
             "physical_control": {
                 "name": "物理操作",

@@ -54,6 +54,14 @@
         }
     },
     "entity": {
+        "sensor": {
+            "brightness": {
+                "name": "Luminosité"
+            },
+            "color_temp": {
+                "name": "Température de couleur"
+            }
+        },
         "event": {
             "physical_control": {
                 "name": "Commande physique",

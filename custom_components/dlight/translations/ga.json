@@ -54,6 +54,14 @@
         }
     },
     "entity": {
+        "sensor": {
+            "brightness": {
+                "name": "Gile"
+            },
+            "color_temp": {
+                "name": "Teocht datha"
+            }
+        },
         "event": {
             "physical_control": {
                 "name": "Rialú fisiciúil",

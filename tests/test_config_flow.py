@@ -9,14 +9,22 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.dlight.const import DOMAIN, CONF_DEVICE_ID
 
 async def test_flow_user_manual(hass):
-    """Test manual entry flow."""
-    # With no devices discovered, the flow should land on the manual step
+    """Test manual entry flow via the discovery_none step."""
+    # With no devices discovered, the flow shows the discovery_none interstitial
     with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
-        assert result["type"] == data_entry_flow.FlowResultType.FORM
-        assert result["step_id"] == "manual"
+        assert result["type"] == data_entry_flow.FlowResultType.MENU
+        assert result["step_id"] == "discovery_none"
+
+    # User chooses manual entry
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"next_step_id": "manual"},
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "manual"
 
     # Fill in the form
     with patch("custom_components.dlight.config_flow.validate_input", return_value={"title": "Test Lamp"}), \
@@ -86,6 +94,54 @@ async def test_flow_manual_from_discovery(hass):
     assert result["type"] == data_entry_flow.FlowResultType.FORM
     assert result["step_id"] == "manual"
 
+async def test_discovery_none_shows_interstitial(hass):
+    """When discovery returns no results, the flow shows the discovery_none step."""
+    with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.MENU
+    assert result["step_id"] == "discovery_none"
+
+
+async def test_discovery_none_retry_reruns_discovery(hass):
+    """Choosing 'retry' from discovery_none reruns discovery and shows lamps if found."""
+    mock_devices = [
+        {"deviceId": "lamp_id", "ip_address": "192.168.1.55", "deviceModel": "dLight"}
+    ]
+    with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+    assert result["step_id"] == "discovery_none"
+
+    # Retry: this time discovery finds a lamp
+    with patch("custom_components.dlight.config_flow.discover_devices", return_value=mock_devices):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"next_step_id": "retry"},
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "discovery"
+
+
+async def test_discovery_none_retry_still_empty_shows_interstitial_again(hass):
+    """Retrying when discovery still finds nothing shows discovery_none again."""
+    with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+    assert result["step_id"] == "discovery_none"
+
+    with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"next_step_id": "retry"},
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.MENU
+    assert result["step_id"] == "discovery_none"
+
+
 async def test_discovery_heals_changed_ip(hass):
     """A known lamp rediscovered on a new IP gets its entry updated silently."""
     entry = MockConfigEntry(
@@ -107,9 +163,9 @@ async def test_discovery_heals_changed_ip(hass):
         )
         await hass.async_block_till_done()
 
-    # The healed lamp is not offered again; with nothing new the flow goes manual
-    assert result["type"] == data_entry_flow.FlowResultType.FORM
-    assert result["step_id"] == "manual"
+    # The healed lamp is not offered again; with nothing new the flow shows discovery_none
+    assert result["type"] == data_entry_flow.FlowResultType.MENU
+    assert result["step_id"] == "discovery_none"
     # ...but its stored IP has been refreshed
     assert entry.data[CONF_IP_ADDRESS] == "192.168.1.99"
 
@@ -127,7 +183,14 @@ async def test_manual_readd_updates_ip(hass):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
-        assert result["step_id"] == "manual"
+        assert result["step_id"] == "discovery_none"
+
+    # Advance past the discovery_none interstitial
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"next_step_id": "manual"},
+    )
+    assert result["step_id"] == "manual"
 
     with patch("custom_components.dlight.async_setup_entry", return_value=True):
         result = await hass.config_entries.flow.async_configure(

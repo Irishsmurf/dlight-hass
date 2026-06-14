@@ -141,7 +141,22 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if self._discovered:
             return await self.async_step_discovery()
-        return await self.async_step_manual()
+        return await self.async_step_discovery_none()
+
+    async def async_step_discovery_none(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Inform the user that no lamps were found and offer next steps."""
+        return self.async_show_menu(
+            step_id="discovery_none",
+            menu_options=["manual", "retry"],
+        )
+
+    async def async_step_retry(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Retry discovery from the discovery_none menu."""
+        return await self.async_step_user()
 
     async def async_step_discovery(
         self, user_input: dict[str, Any] | None = None

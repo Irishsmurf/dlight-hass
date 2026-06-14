@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add `sensor` platform with two diagnostic entities per lamp: **Brightness** (%, unique id `dlight_{id}_brightness`) and **Color Temperature** (K, unique id `dlight_{id}_color_temp`), both backed by the existing coordinator poll with no extra network traffic (closes #64).
+
 ### Changed
 - Add `--cov-fail-under=80` coverage gate and `--cov-report=term-missing` summary to the CI pytest job; PRs that drop overall coverage below 80% now fail with a clear per-module report (closes #62).
 

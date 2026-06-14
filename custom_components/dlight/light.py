@@ -267,9 +267,12 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             return
 
         # Clamp to the minimum safe brightness floor (device-percent level).
+        # clamped_pct is used directly in device commands to avoid a lossy
+        # HA-scale → device-percent → HA-scale round-trip.
+        clamped_pct: int | None = None
         if brightness is not None:
             clamped_pct = max(_to_dlight_brightness(brightness), MIN_BRIGHTNESS_PCT)
-            brightness = math.floor(clamped_pct / 100 * 255)
+            brightness = _to_ha_brightness(clamped_pct)
 
         # The newest command always wins over a fade already in flight.
         await self._async_cancel_transition()
@@ -308,17 +311,17 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         # When both brightness and temperature are set atomically, apply_scene
         # reduces two TCP commands to one and rolls back both on failure.
         commands = []
-        if brightness is not None and kelvin is not None:
+        if clamped_pct is not None and kelvin is not None:
             commands.append(
                 self.device.apply_scene(
-                    brightness=_to_dlight_brightness(brightness),
+                    brightness=clamped_pct,
                     temperature=int(kelvin),
                 )
             )
         else:
-            if brightness is not None:
+            if clamped_pct is not None:
                 commands.append(
-                    self.device.set_brightness(_to_dlight_brightness(brightness))
+                    self.device.set_brightness(clamped_pct)
                 )
             if kelvin is not None:
                 commands.append(self.device.set_color_temperature(int(kelvin)))
@@ -678,10 +681,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             if self._optimistic_on != polled_on:
                 matches = False
             if self._optimistic_brightness is not None:
-                if (
-                    _to_dlight_brightness(self._optimistic_brightness)
-                    != polled_brightness
-                ):
+                if _to_ha_brightness(polled_brightness) != self._optimistic_brightness:
                     matches = False
             if (
                 self._optimistic_kelvin is not None

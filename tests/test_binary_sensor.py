@@ -61,7 +61,7 @@ async def test_connectivity_sensor_health_attributes_degraded(
     hass, mock_dlight_device, mock_config_entry
 ):
     """consecutive_failures increments on poll errors; rediscovery_in_progress reflects task state."""
-    from unittest.mock import patch as _patch
+    from unittest.mock import AsyncMock, patch as _patch
 
     await setup_integration(hass, mock_config_entry)
     entity_id = er.async_get(hass).async_get_entity_id(
@@ -72,7 +72,7 @@ async def test_connectivity_sensor_health_attributes_degraded(
 
     mock_dlight_device.get_state.side_effect = DLightConnectionError("gone")
     # Suppress rediscovery so the test doesn't trigger an entry reload.
-    with _patch.object(coordinator, "_async_attempt_rediscovery", return_value=None):
+    with _patch.object(coordinator, "_async_attempt_rediscovery", new_callable=AsyncMock):
         for _ in range(REDISCOVERY_FAILURE_THRESHOLD):
             await coordinator.async_refresh()
             await hass.async_block_till_done()

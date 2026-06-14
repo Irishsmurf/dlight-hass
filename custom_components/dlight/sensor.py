@@ -79,7 +79,7 @@ class DLightColorTempSensor(_DLightSensorBase):
     """Reports lamp color temperature in Kelvin."""
 
     _attr_translation_key = "color_temp"
-    _attr_native_unit_of_measurement = _UNIT_KELVIN
+    _attr_native_unit_of_measurement = UnitOfTemperature.KELVIN
 
     def __init__(self, coordinator: DLightCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)

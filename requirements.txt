@@ -1,1 +1,6 @@
 dlight-client==2.0.0
+pytest
+pytest-asyncio
+pytest-homeassistant-custom-component
+pytest-sugar
+pytest-cov

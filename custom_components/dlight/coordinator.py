@@ -80,6 +80,11 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Return the timestamp of the last successful poll."""
         return self._last_successful_poll
 
+    @property
+    def rediscovery_in_progress(self) -> bool:
+        """Return True while a UDP rediscovery sweep task is actively running."""
+        return self._rediscovery_task is not None and not self._rediscovery_task.done()
+
     @callback
     def _handle_device_state_change(
         self,

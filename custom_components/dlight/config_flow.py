@@ -25,7 +25,7 @@ from dlightclient import (
     STATUS_SUCCESS,
     AsyncDLightClient,
     DLightError,
-    discover_devices,
+    discover_devices_stream,
 )
 
 from homeassistant import config_entries, exceptions
@@ -111,11 +111,12 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             return await self.async_step_manual(user_input)
 
+        devices: list[dict] = []
         try:
-            devices = await discover_devices(discovery_duration=DISCOVERY_DURATION)
+            async for found in discover_devices_stream(timeout=DISCOVERY_DURATION):
+                devices.append(found)
         except Exception:  # noqa: BLE001 — discovery is best-effort, never fatal
             _LOGGER.exception("dLight discovery failed; falling back to manual entry")
-            devices = []
 
         _LOGGER.debug("dLight discovery found %d device(s)", len(devices))
         self._discovered = self._filter_new_devices(devices)
@@ -169,11 +170,12 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         existing entries — silently reloading a coordinator mid-use is an
         unexpected side effect in this context.
         """
+        devices: list[dict] = []
         try:
-            devices = await discover_devices(discovery_duration=DISCOVERY_DURATION)
+            async for found in discover_devices_stream(timeout=DISCOVERY_DURATION):
+                devices.append(found)
         except Exception:  # noqa: BLE001 — discovery is best-effort, never fatal
             _LOGGER.exception("dLight discovery failed during retry; falling back to discovery_none")
-            devices = []
 
         _LOGGER.debug("dLight retry discovery found %d device(s)", len(devices))
         self._discovered = self._filter_new_devices(devices)

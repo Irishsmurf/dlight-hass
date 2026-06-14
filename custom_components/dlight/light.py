@@ -20,6 +20,7 @@ emulated — a background task walks brightness/temperature toward the target
 in small steps. The task is cancelled by any newer command, so the latest
 request always wins.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -47,7 +48,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, KELVIN_MAX, KELVIN_MIN, POLL_INTERVAL
+from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, KELVIN_MAX, KELVIN_MIN, POLL_INTERVAL
 from .coordinator import DLightCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -179,6 +180,10 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         # every new command cancels it before doing anything else.
         self._transition_task: asyncio.Task | None = None
 
+        # Snapshot of the last coordinator-confirmed state, used to detect
+        # physical changes between polls. None until the first poll is accepted.
+        self._last_confirmed_data: dict | None = None
+
         # The registry card is built once: coordinator.info is static
         # (fetched a single time at setup, see DLightCoordinator).
         device_info = DeviceInfo(
@@ -281,7 +286,9 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
         commands = []
         if brightness is not None:
-            commands.append(self.device.set_brightness(_to_dlight_brightness(brightness)))
+            commands.append(
+                self.device.set_brightness(_to_dlight_brightness(brightness))
+            )
         if kelvin is not None:
             commands.append(self.device.set_color_temperature(int(kelvin)))
         # Setting brightness/temperature implicitly powers the lamp on, so the
@@ -463,7 +470,9 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         transition: float,
     ) -> tuple[list[tuple[int | None, int | None]], float]:
         """Slice a transition into timed steps of interpolated values."""
-        count = max(1, min(round(transition / TRANSITION_STEP_INTERVAL), TRANSITION_MAX_STEPS))
+        count = max(
+            1, min(round(transition / TRANSITION_STEP_INTERVAL), TRANSITION_MAX_STEPS)
+        )
         interval = transition / count
         steps = _interpolate_steps(start_pct, end_pct, start_kelvin, end_kelvin, count)
         return steps, interval
@@ -535,6 +544,12 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                 await self._transition_task
         self._transition_task = None
 
+    async def async_added_to_hass(self) -> None:
+        """Entity is live: snapshot coordinator state as the physical baseline."""
+        await super().async_added_to_hass()
+        if self.coordinator.data is not None:
+            self._last_confirmed_data = self.coordinator.data
+
     async def async_will_remove_from_hass(self) -> None:
         """Entity is going away: never leave a fade task running behind it."""
         await self._async_cancel_transition()
@@ -560,6 +575,10 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
              A matching poll means the lamp confirmed the command — clear
              the optimistic state immediately.  A mismatching poll is stale
              and is ignored so the UI doesn't snap back.
+
+        When a poll arrives outside the hold window and the state has changed
+        since the last confirmed update, a dlight_physical_control event is
+        fired on the HA event bus (physical button press or external client).
         """
         if self.coordinator.data is None:
             return  # failed poll; availability handling is CoordinatorEntity's job
@@ -568,10 +587,13 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             # wherever the lamp was when polled. The fade requests its own
             # refresh on completion.
             return
-        if (
+
+        within_hold = (
             self._optimistic_on is not None
             and time.monotonic() - self._last_command_time < POLL_INTERVAL
-        ):
+        )
+
+        if within_hold:
             data = self.coordinator.data
             polled_on = data.get("on")
             polled_brightness = data.get("brightness")
@@ -585,7 +607,10 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             if self._optimistic_on != polled_on:
                 matches = False
             if self._optimistic_brightness is not None:
-                if _to_dlight_brightness(self._optimistic_brightness) != polled_brightness:
+                if (
+                    _to_dlight_brightness(self._optimistic_brightness)
+                    != polled_brightness
+                ):
                     matches = False
             if (
                 self._optimistic_kelvin is not None
@@ -598,5 +623,58 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                 # this poll to prevent the UI from snapping back to a stale
                 # value during rapid-fire interactions.
                 return
+            # Matching poll confirms the HA command — fall through to update.
+        else:
+            # Outside the hold window: any change was driven externally.
+            if self._last_confirmed_data is not None:
+                self._fire_physical_control_event(
+                    self._last_confirmed_data, self.coordinator.data
+                )
+
+        self._last_confirmed_data = self.coordinator.data
         self._clear_optimistic_state()
         super()._handle_coordinator_update()
+
+    @callback
+    def _fire_physical_control_event(self, prev: dict, new: dict) -> None:
+        """Fire EVENT_PHYSICAL_CONTROL when a poll reveals an external state change."""
+        prev_on = prev.get("on")
+        new_on = new.get("on")
+        prev_brightness = prev.get("brightness")
+        new_brightness = new.get("brightness")
+        prev_kelvin = (
+            prev.get("color", {}).get("temperature")
+            if isinstance(prev.get("color"), dict)
+            else None
+        )
+        new_kelvin = (
+            new.get("color", {}).get("temperature")
+            if isinstance(new.get("color"), dict)
+            else None
+        )
+
+        if (
+            prev_on == new_on
+            and prev_brightness == new_brightness
+            and prev_kelvin == new_kelvin
+        ):
+            return  # poll was a no-op; nothing to report
+
+        if prev_on != new_on:
+            action = "turned_on" if new_on else "turned_off"
+        else:
+            action = "changed"
+
+        self.hass.bus.async_fire(
+            EVENT_PHYSICAL_CONTROL,
+            {
+                "device_id": self.device.id,
+                "entity_id": self.entity_id,
+                "action": action,
+                "previous_state": prev,
+                "new_state": new,
+            },
+        )
+        _LOGGER.debug(
+            "dLight %s: physical control detected (%s)", self.device.id, action
+        )

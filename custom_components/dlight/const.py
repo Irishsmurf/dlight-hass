@@ -1,7 +1,9 @@
 """Constants for the dLight integration."""
+
 from homeassistant.const import Platform
 
 DOMAIN = "dlight"
+EVENT_PHYSICAL_CONTROL = "dlight_physical_control"
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.LIGHT]
 
 # Extra config-entry key (the IP address uses HA's standard CONF_IP_ADDRESS).

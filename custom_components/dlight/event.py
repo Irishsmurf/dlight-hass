@@ -20,8 +20,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, EVENT_PHYSICAL_CONTROL
+from .coordinator import DLightCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,20 +34,24 @@ EVENT_TYPES = ["turned_on", "turned_off", "changed"]
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: ConfigEntry[DLightCoordinator],
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add the physical-control event entity for an already-initialized lamp."""
     coordinator = entry.runtime_data
-    async_add_entities([DLightEventEntity(coordinator.device, entry)])
+    async_add_entities([DLightEventEntity(coordinator, entry)])
 
 
-class DLightEventEntity(EventEntity):
+class DLightEventEntity(CoordinatorEntity[DLightCoordinator], EventEntity):
     """Surfaces physical dLight interactions as a proper HA EventEntity.
 
     Subscribes to the dlight_physical_control bus event fired by DLightEntity
     (light.py) and calls _trigger_event() so the interaction appears under the
     device in the UI and can be used in standard HA automations.
+
+    Inherits CoordinatorEntity so availability automatically mirrors the
+    coordinator's poll health — the entity goes unavailable when the lamp
+    cannot be reached.
     """
 
     _attr_has_entity_name = True
@@ -54,13 +60,14 @@ class DLightEventEntity(EventEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_event_types = EVENT_TYPES
 
-    def __init__(self, device, entry: ConfigEntry) -> None:
+    def __init__(self, coordinator: DLightCoordinator, entry: ConfigEntry[DLightCoordinator]) -> None:
         """Initialize the event entity."""
-        self._device = device
-        self._attr_unique_id = f"dlight_{device.id}_physical_control"
-        base_name = entry.title or f"dLight {device.id}"
+        super().__init__(coordinator)
+        self._device = coordinator.device
+        self._attr_unique_id = f"dlight_{self._device.id}_physical_control"
+        base_name = entry.title or f"dLight {self._device.id}"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, device.id)}, name=base_name
+            identifiers={(DOMAIN, self._device.id)}, name=base_name
         )
 
     async def async_added_to_hass(self) -> None:

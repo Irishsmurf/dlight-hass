@@ -7,6 +7,8 @@ dropping off the network (notify, retry, power-cycle a smart plug, ...).
 """
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -17,7 +19,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, POLL_INTERVAL, REDISCOVERY_FAILURE_THRESHOLD
 from .coordinator import DLightCoordinator
 
 # Read-only view over coordinator data; nothing to serialize.
@@ -69,3 +71,14 @@ class DLightConnectivitySensor(CoordinatorEntity[DLightCoordinator], BinarySenso
     def is_on(self) -> bool:
         """Return True while polls are reaching the lamp."""
         return self.coordinator.last_update_success
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose coordinator health metrics for dashboards and automations."""
+        coord = self.coordinator
+        return {
+            "consecutive_failures": coord.consecutive_failures,
+            "last_successful_poll": coord.last_successful_poll,
+            "rediscovery_triggered": coord.consecutive_failures >= REDISCOVERY_FAILURE_THRESHOLD,
+            "poll_interval_seconds": POLL_INTERVAL,
+        }

@@ -4,7 +4,7 @@ from homeassistant.const import Platform
 
 DOMAIN = "dlight"
 EVENT_PHYSICAL_CONTROL = "dlight_physical_control"
-PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.EVENT, Platform.LIGHT, Platform.SENSOR]
+PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.EVENT, Platform.LIGHT, Platform.SENSOR, Platform.UPDATE]
 
 # Extra config-entry key (the IP address uses HA's standard CONF_IP_ADDRESS).
 CONF_DEVICE_ID = "device_id"

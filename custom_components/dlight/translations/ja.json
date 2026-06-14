@@ -62,6 +62,11 @@
                 "name": "色温度"
             }
         },
+        "update": {
+            "firmware": {
+                "name": "ファームウェア"
+            }
+        },
         "event": {
             "physical_control": {
                 "name": "物理操作",

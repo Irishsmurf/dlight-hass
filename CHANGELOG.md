@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Add `sensor` platform with two diagnostic entities per lamp: **Brightness** (%, unique id `dlight_{id}_brightness`) and **Color Temperature** (K, unique id `dlight_{id}_color_temp`), both backed by the existing coordinator poll with no extra network traffic (closes #64).
 - Migrate config flow `async_step_user` and `async_step_retry` from blocking `discover_devices()` to streaming `discover_devices_stream()`; a lamp that answers immediately now resolves the pick-list without waiting the full 2-second discovery window (closes #63).
+- Add `update` platform with a `DLightUpdateEntity` that surfaces `coordinator.info["swVersion"]` as the installed firmware version (`latest_version = None` until an OTA source is known); entity is diagnostic and goes unavailable with the coordinator (closes #65).
 
 ### Changed
 - Add `--cov-fail-under=80` coverage gate and `--cov-report=term-missing` summary to the CI pytest job; PRs that drop overall coverage below 80% now fail with a clear per-module report (closes #62).

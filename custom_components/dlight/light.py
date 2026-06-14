@@ -280,7 +280,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         if (
             transition is not None
             and transition > 0
-            and self._async_start_turn_on_fade(brightness, kelvin, transition)
+            and self._async_start_turn_on_fade(clamped_pct, kelvin, transition)
         ):
             return
 
@@ -441,9 +441,12 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
     @callback
     def _async_start_turn_on_fade(
-        self, brightness: int | None, kelvin: int | None, transition: float
+        self, target_pct: int | None, kelvin: int | None, transition: float
     ) -> bool:
         """Schedule a fade toward the requested turn_on target.
+
+        target_pct is in device scale (0-100); callers should pass clamped_pct
+        directly to avoid a lossy HA-scale → device-scale → HA-scale round-trip.
 
         Returns False when fading is impossible (the lamp's current state is
         unknown, or nothing would actually change) so the caller falls back
@@ -455,8 +458,8 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
         current_pct = self._current_pct()
 
-        if brightness is not None:
-            end_pct = _to_dlight_brightness(brightness)
+        if target_pct is not None:
+            end_pct = target_pct
         elif not is_on:
             # Bare turn_on from off: fade in to the last known level.
             end_pct = current_pct or 100
@@ -681,7 +684,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             if self._optimistic_on != polled_on:
                 matches = False
             if self._optimistic_brightness is not None:
-                if _to_ha_brightness(polled_brightness) != self._optimistic_brightness:
+                if polled_brightness is None or _to_ha_brightness(polled_brightness) != self._optimistic_brightness:
                     matches = False
             if (
                 self._optimistic_kelvin is not None

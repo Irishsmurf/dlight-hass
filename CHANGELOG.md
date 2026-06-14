@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Register `client.close` before `async_config_entry_first_refresh()` so the persistent TCP connection is always cleaned up, even when setup fails with `ConfigEntryNotReady`.
+
 ### Added
+- Add `tests/test_init.py` with 8 lifecycle tests covering setup, unload, client cleanup on success and failure, listener registration/removal, and missing-config error paths.
 - Add `EventEntity` (`event.py`) for physical control: physical button presses and external state changes now appear as a proper device entity in the HA UI (device class `button`, diagnostic category), in addition to the existing `dlight_physical_control` bus event. Supports event types `turned_on`, `turned_off`, and `changed`.
 - Add `docs/user-guide/physical-control-event.md` documenting the `dlight_physical_control` event: payload reference, automation examples, Physical Control entity usage, and limitations. Linked from `features.md`, `mkdocs.yml` nav, and `README.md`.
 

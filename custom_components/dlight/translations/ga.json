@@ -21,6 +21,14 @@
                     "name": "Ainm cairdiúil roghnach. Úsáidtear múnla an ghléis mar réamhshocrú."
                 }
             },
+            "discovery_none": {
+                "title": "Níor aimsíodh lampaí",
+                "description": "Níor fhreagair aon lampa dLight do chraoladh fionnachtana UDP. Is gnách go gciallaíonn sé seo go bhfuil trácht craolta á scagadh ar do líonra. Is féidir leat seoladh IP an lampa a iontráil de láimh, nó scanadh arís.",
+                "menu_options": {
+                    "manual": "Iontráil seoladh IP de láimh",
+                    "retry": "Triail arís"
+                }
+            },
             "reconfigure": {
                 "title": "Athchumraigh dLight",
                 "description": "Nuashonraigh sonraí ceangail an lampa seo.",

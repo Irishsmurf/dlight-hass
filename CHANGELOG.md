@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Add missing `discovery_none` translation strings to `strings.json` and all five locale files (`en`, `de`, `fr`, `ga`, `ja`), fixing blank UI when UDP discovery returns zero results (closes #45).
+
 ### Added
 - Add structured debug logging across `coordinator.py` (poll start/success/failure, rediscovery), `light.py` (turn-on/off/toggle params, optimistic state, fade step-by-step, poll-guard decisions), and `config_flow.py` (discovery result count, known-lamp self-heal, DHCP step trigger).
 - Expand `tests/fake_lamp.py` with injectable chaos: `--drop-rate`, `--error-rate`, `--latency`, `--latency-spike`, `--disconnect-after`, and `--offline-for` CLI flags; runtime `chaos`, `spike`, `offline`, and `disconnect` interactive commands. Add Chaos Testing guide to `docs/contributing/development.md`.

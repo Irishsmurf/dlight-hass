@@ -117,6 +117,7 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.exception("dLight discovery failed; falling back to manual entry")
             devices = []
 
+        _LOGGER.debug("dLight discovery found %d device(s)", len(devices))
         # Split discoveries: unknown lamps go to the pick-list; known lamps
         # (matched by unique_id) get their stored IP self-healed if the
         # router handed them a new address since setup.
@@ -215,6 +216,7 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         identifier; the standard unique-id machinery then updates the entry's
         IP (and reloads it) before aborting.
         """
+        _LOGGER.debug("dLight DHCP step triggered (mac=<redacted>)")
         mac = dr.format_mac(discovery_info.macaddress)
         device = dr.async_get(self.hass).async_get_device(
             connections={(dr.CONNECTION_NETWORK_MAC, mac)}

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Fire a `dlight_physical_control` HA event when a poll detects a state change that was not initiated by Home Assistant, enabling automations that respond to physical button presses or external control.
 - Integrate Codecov Flags (`coordinator`, `config_flow`, `light`, `button`, `binary_sensor`) for per-component coverage segmentation in CI.
+- Add Codecov component definitions (`coordinator`, `config_flow`, `light_entity`, `diagnostics`, `integration_init`) for per-feature coverage thresholds and targeted PR feedback.
 
 ## [2.0.0] - 2026-06-14
 

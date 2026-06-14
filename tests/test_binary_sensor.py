@@ -68,7 +68,7 @@ async def test_connectivity_sensor_health_attributes_degraded(
         "binary_sensor", DOMAIN, "dlight_test_device_id_connectivity"
     )
     coordinator = mock_config_entry.runtime_data
-    last_good_poll = hass.states.get(entity_id).attributes["last_successful_poll"]
+    last_good_poll = coordinator.last_successful_poll
 
     mock_dlight_device.get_state.side_effect = DLightConnectionError("gone")
     # Suppress rediscovery so the test doesn't trigger an entry reload.
@@ -79,10 +79,10 @@ async def test_connectivity_sensor_health_attributes_degraded(
 
     # Check coordinator state directly (entity state cache may only update on
     # last_update_success transitions, not every failure increment).
-    assert coordinator._consecutive_failures == REDISCOVERY_FAILURE_THRESHOLD
-    assert coordinator._last_successful_poll is not None
-    assert coordinator._last_successful_poll.isoformat() == last_good_poll
-    assert coordinator._consecutive_failures >= REDISCOVERY_FAILURE_THRESHOLD  # rediscovery_triggered
+    assert coordinator.consecutive_failures == REDISCOVERY_FAILURE_THRESHOLD
+    assert coordinator.last_successful_poll is not None
+    assert coordinator.last_successful_poll == last_good_poll
+    assert coordinator.consecutive_failures >= REDISCOVERY_FAILURE_THRESHOLD  # rediscovery_triggered
 
     # Recovery: failures reset, timestamp refreshes, rediscovery_triggered clears.
     mock_dlight_device.get_state.side_effect = None

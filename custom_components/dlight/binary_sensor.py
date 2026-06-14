@@ -76,10 +76,9 @@ class DLightConnectivitySensor(CoordinatorEntity[DLightCoordinator], BinarySenso
     def extra_state_attributes(self) -> dict[str, Any]:
         """Expose coordinator health metrics for dashboards and automations."""
         coord = self.coordinator
-        last_poll = coord._last_successful_poll
         return {
-            "consecutive_failures": coord._consecutive_failures,
-            "last_successful_poll": last_poll.isoformat() if last_poll else None,
-            "rediscovery_triggered": coord._consecutive_failures >= REDISCOVERY_FAILURE_THRESHOLD,
+            "consecutive_failures": coord.consecutive_failures,
+            "last_successful_poll": coord.last_successful_poll,
+            "rediscovery_triggered": coord.consecutive_failures >= REDISCOVERY_FAILURE_THRESHOLD,
             "poll_interval_seconds": POLL_INTERVAL,
         }

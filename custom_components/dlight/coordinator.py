@@ -70,6 +70,16 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._rediscovery_task: asyncio.Task | None = None
         self._last_successful_poll: datetime | None = None
 
+    @property
+    def consecutive_failures(self) -> int:
+        """Return the number of consecutive failed polls."""
+        return self._consecutive_failures
+
+    @property
+    def last_successful_poll(self) -> datetime | None:
+        """Return the timestamp of the last successful poll."""
+        return self._last_successful_poll
+
     @callback
     def _handle_device_state_change(
         self,

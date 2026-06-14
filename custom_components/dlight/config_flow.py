@@ -127,11 +127,11 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def _filter_new_devices(self, devices: list[dict]) -> dict[str, dict]:
         """Return only devices not already registered as config entries."""
-        known_ids = {entry.unique_id for entry in self._async_current_entries()}
+        known_ids = {entry.unique_id for entry in self._async_current_entries() if entry.unique_id}
         return {
-            d["deviceId"]: d
+            device_id: d
             for d in devices
-            if f"dlight_{d['deviceId']}" not in known_ids
+            if (device_id := d.get("deviceId")) and f"dlight_{device_id}" not in known_ids
         }
 
     def _heal_known_lamps(self, devices: list[dict]) -> None:

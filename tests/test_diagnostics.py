@@ -36,6 +36,7 @@ async def test_diagnostics_redacts_identifiers(hass):
                 "swVersion": "1.0.0",
                 "hwVersion": "1.0.0",
                 "deviceModel": "Test Lamp",
+                "macAddress": "AA:BB:CC:DD:EE:FF",
             }
         )
 
@@ -56,5 +57,8 @@ async def test_diagnostics_redacts_identifiers(hass):
         "color": {"temperature": 4000},
     }
     assert diagnostics["device_info"]["deviceModel"] == "Test Lamp"
+    assert diagnostics["device_info"]["swVersion"] == "1.0.0"
+    assert diagnostics["device_info"]["hwVersion"] == "1.0.0"
+    assert diagnostics["device_info"]["macAddress"] == "**REDACTED**"
     assert diagnostics["last_update_success"] is True
     assert diagnostics["update_interval"] == "0:00:30"

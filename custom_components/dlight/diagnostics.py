@@ -15,7 +15,7 @@ from . import DLightConfigEntry
 from .const import CONF_DEVICE_ID
 
 # Anything that identifies the user's network or specific device.
-TO_REDACT = {CONF_IP_ADDRESS, CONF_DEVICE_ID}
+TO_REDACT = {CONF_IP_ADDRESS, CONF_DEVICE_ID, "macAddress"}
 
 
 async def async_get_config_entry_diagnostics(
@@ -28,7 +28,7 @@ async def async_get_config_entry_diagnostics(
             "data": async_redact_data(dict(entry.data), TO_REDACT),
             "options": dict(entry.options),
         },
-        "device_info": coordinator.info,  # model/firmware; no identifiers
+        "device_info": async_redact_data(coordinator.info or {}, TO_REDACT),
         "state": coordinator.data,  # last polled on/brightness/color
         "last_update_success": coordinator.last_update_success,
         "update_interval": str(coordinator.update_interval),

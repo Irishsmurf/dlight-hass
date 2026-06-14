@@ -45,6 +45,22 @@
             "unknown_device": "This network device does not match any configured dLight lamp."
         }
     },
+    "entity": {
+        "event": {
+            "physical_control": {
+                "name": "Physical control",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "turned_on": "Turned on",
+                            "turned_off": "Turned off",
+                            "changed": "Changed"
+                        }
+                    }
+                }
+            }
+        }
+    },
     "exceptions": {
         "turn_on_failed": {
             "message": "Failed to turn on {device_name}. Device reported: {error}"

@@ -45,6 +45,22 @@
             "unknown_device": "Ní mheaitseálann an gléas líonra seo aon lampa dLight atá cumraithe."
         }
     },
+    "entity": {
+        "event": {
+            "physical_control": {
+                "name": "Rialú fisiciúil",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "turned_on": "Las",
+                            "turned_off": "Múchadh",
+                            "changed": "Athraíodh"
+                        }
+                    }
+                }
+            }
+        }
+    },
     "exceptions": {
         "turn_on_failed": {
             "message": "Theip ar lasadh {device_name}. Thuairiscigh an gléas: {error}"

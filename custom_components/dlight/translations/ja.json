@@ -45,6 +45,22 @@
             "unknown_device": "このネットワークデバイスは、設定済みのdLightランプと一致しません。"
         }
     },
+    "entity": {
+        "event": {
+            "physical_control": {
+                "name": "物理操作",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "turned_on": "オンにした",
+                            "turned_off": "オフにした",
+                            "changed": "変更した"
+                        }
+                    }
+                }
+            }
+        }
+    },
     "exceptions": {
         "turn_on_failed": {
             "message": "{device_name} のオンに失敗しました。デバイスの報告: {error}"

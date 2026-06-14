@@ -45,6 +45,22 @@
             "unknown_device": "Dieses Netzwerkgerät entspricht keiner konfigurierten dLight-Lampe."
         }
     },
+    "entity": {
+        "event": {
+            "physical_control": {
+                "name": "Physische Steuerung",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "turned_on": "Eingeschaltet",
+                            "turned_off": "Ausgeschaltet",
+                            "changed": "Geändert"
+                        }
+                    }
+                }
+            }
+        }
+    },
     "exceptions": {
         "turn_on_failed": {
             "message": "Fehler beim Einschalten von {device_name}. Das Gerät meldete: {error}"

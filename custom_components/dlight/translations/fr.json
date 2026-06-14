@@ -45,6 +45,22 @@
             "unknown_device": "Cet appareil réseau ne correspond à aucune lampe dLight configurée."
         }
     },
+    "entity": {
+        "event": {
+            "physical_control": {
+                "name": "Commande physique",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "turned_on": "Allumé",
+                            "turned_off": "Éteint",
+                            "changed": "Modifié"
+                        }
+                    }
+                }
+            }
+        }
+    },
     "exceptions": {
         "turn_on_failed": {
             "message": "Échec de l'allumage de {device_name}. L'appareil a signalé : {error}"

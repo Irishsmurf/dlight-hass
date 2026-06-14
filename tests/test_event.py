@@ -115,6 +115,26 @@ async def test_event_entity_ignores_other_device(hass, mock_dlight_device, mock_
     assert hass.states.get(entity_id).attributes.get("event_type") is None
 
 
+async def test_event_entity_ignores_unknown_action(hass, mock_dlight_device, mock_config_entry):
+    """EventEntity silently ignores bus events whose action is not a declared event type."""
+    await setup_integration(hass, mock_config_entry)
+    entity_id = await _event_entity_id(hass)
+
+    hass.bus.async_fire(
+        EVENT_PHYSICAL_CONTROL,
+        {
+            "device_id": "test_device_id",
+            "entity_id": "light.test_light",
+            "action": "some_future_unknown_action",
+            "previous_state": {},
+            "new_state": {},
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert hass.states.get(entity_id).attributes.get("event_type") is None
+
+
 async def test_event_entity_not_fired_on_first_poll(hass, mock_dlight_device, mock_config_entry):
     """No event fires during integration setup (the initial poll sets the baseline)."""
     from unittest.mock import patch

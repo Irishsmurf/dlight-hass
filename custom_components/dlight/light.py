@@ -433,9 +433,17 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         """
         async with self.coordinator.command_lock:
             results = await asyncio.gather(*commands, return_exceptions=True)
-        for result in results:
-            if isinstance(result, Exception):
-                raise result
+        errors = [r for r in results if isinstance(r, Exception)]
+        if len(errors) > 1:
+            for exc in errors[1:]:
+                _LOGGER.warning(
+                    "dLight %s: additional command failure in batch: %s",
+                    self.device.id,
+                    exc,
+                    exc_info=exc,
+                )
+        if errors:
+            raise errors[0]
 
     # --- Emulated transitions ---
 

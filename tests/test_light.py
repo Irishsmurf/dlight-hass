@@ -2,7 +2,7 @@ import asyncio
 import math
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from homeassistant.components.light import DOMAIN as LIGHT_DOMAIN
 
 from custom_components.dlight.const import DOMAIN, EVENT_PHYSICAL_CONTROL
@@ -1103,4 +1103,50 @@ async def test_fade_up_from_subfloor_brightness_anchors_start(
     assert brightness_calls, "No set_brightness calls — fade did not run"
     assert brightness_calls[0] > MIN_BRIGHTNESS_PCT, (
         f"Fade stuttered to floor on first step: calls={brightness_calls}"
+    )
+
+
+async def test_send_logs_all_exceptions_in_batch(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """When two commands fail simultaneously, all failures appear in the log.
+
+    turn_on(brightness=X) while the lamp is off issues two concurrent commands:
+    turn_on() and set_brightness(). If both fail, only the first is re-raised
+    as a HomeAssistantError but the second must appear in the WARNING log.
+    """
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Put the lamp in the off state so turn_on() is prepended to the batch.
+    mock_dlight_device.get_state.return_value = {
+        "on": False,
+        "brightness": 50,
+        "color": {"temperature": 4000},
+    }
+    coordinator = mock_config_entry.runtime_data
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    err1 = OSError("network error on turn_on")
+    err2 = OSError("network error on set_brightness")
+
+    mock_dlight_device.turn_on.side_effect = err1
+    mock_dlight_device.set_brightness.side_effect = err2
+
+    with pytest.raises(Exception), \
+         patch("custom_components.dlight.light._LOGGER") as mock_logger:
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "brightness": 128},
+            blocking=True,
+        )
+
+    # The second (additional) exception must be logged as a warning
+    warning_calls = [str(c) for c in mock_logger.warning.call_args_list]
+    assert any("additional command failure" in c for c in warning_calls), (
+        f"Second exception was not logged. warning calls: {warning_calls}"
     )

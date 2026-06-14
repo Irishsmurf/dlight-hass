@@ -1045,25 +1045,11 @@ async def test_turn_off_fade_from_low_brightness_uses_fade_to_off_target(
         c.args[0] for c in mock_dlight_device.set_brightness.call_args_list
     ]
 
-    # Must have produced brightness steps.
-    assert len(brightness_calls) >= 1, "Expected fade steps but none were sent"
-
-    # The floor clamps every step to at least MIN_BRIGHTNESS_PCT; the last
-    # sent value is always 5%, not the raw FADE_TO_OFF_TARGET_PCT (1%).
-    assert brightness_calls[-1] == MIN_BRIGHTNESS_PCT, (
-        f"Last fade step was {brightness_calls[-1]}%, expected {MIN_BRIGHTNESS_PCT}% "
-        f"(floor-clamped). Got {brightness_calls}"
-    )
-
-    # The fade plan targets 1% (not 5%), so the interpolation covers the full
-    # 10%→1% span and produces more steps than a 10%→5% plan would.
-    # With start=10%, FADE_TO_OFF_TARGET_PCT=1%, 5s/0.5s = 10 steps:
-    # raw interpolation hits every integer from 9 down to 1 → 9 distinct commands.
-    # A broken plan (target=5%) would produce only 5 distinct commands.
-    expected_min_commands = 10 - FADE_TO_OFF_TARGET_PCT  # = 9
-    assert len(brightness_calls) >= expected_min_commands, (
-        f"Expected at least {expected_min_commands} brightness commands for a "
-        f"10%→{FADE_TO_OFF_TARGET_PCT}% plan, got {len(brightness_calls)}: {brightness_calls}"
+    # The fade plan covers 10%→1% but _apply_brightness_floor clamps sub-floor
+    # steps to 5%.  After deduplication in _async_start_turn_off_fade the
+    # redundant floor-clamped commands are removed, leaving exactly [9, 8, 7, 6, 5].
+    assert brightness_calls == [9, 8, 7, 6, 5], (
+        f"Expected exactly [9, 8, 7, 6, 5] brightness commands, got {brightness_calls}"
     )
 
     # Power-off must follow the fade.

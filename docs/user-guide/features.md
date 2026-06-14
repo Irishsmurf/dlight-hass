@@ -56,6 +56,12 @@ automation:
           message: "Desk Lamp has been unreachable for 2 minutes."
 ```
 
+## Physical control detection
+
+When you (or another app) physically interact with a dLight lamp, the coordinator detects the change on the next poll and fires a `dlight_physical_control` event on the HA event bus. Each lamp also exposes a **Physical control** entity (`event` platform, diagnostic category) that updates in the UI for every detected physical interaction.
+
+See [Physical Control Event](physical-control-event.md) for the full payload reference and automation examples.
+
 ## State polling
 
 The coordinator polls each lamp every **30 seconds** (`force_update=True`, bypassing the client's local cache) to keep Home Assistant in sync with changes made outside HA — e.g. via the physical control or another app. A failed poll marks the light **unavailable** and is reflected by the connectivity sensor. See [Coordinator & Polling](../architecture/coordinator.md).

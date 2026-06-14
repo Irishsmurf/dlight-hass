@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Add `EventEntity` (`event.py`) for physical control: physical button presses and external state changes now appear as a proper device entity in the HA UI (device class `button`, diagnostic category), in addition to the existing `dlight_physical_control` bus event. Supports event types `turned_on`, `turned_off`, and `changed`.
+- Add `docs/user-guide/physical-control-event.md` documenting the `dlight_physical_control` event: payload reference, automation examples, Physical Control entity usage, and limitations. Linked from `features.md`, `mkdocs.yml` nav, and `README.md`.
 
 ## [2.1.0] - 2026-06-14
 

@@ -118,16 +118,28 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             devices = []
 
         _LOGGER.debug("dLight discovery found %d device(s)", len(devices))
-        # Split discoveries: unknown lamps go to the pick-list; known lamps
-        # (matched by unique_id) get their stored IP self-healed if the
-        # router handed them a new address since setup.
+        self._discovered = self._filter_new_devices(devices)
+        self._heal_known_lamps(devices)
+
+        if self._discovered:
+            return await self.async_step_discovery()
+        return await self.async_step_discovery_none()
+
+    def _filter_new_devices(self, devices: list[dict]) -> dict[str, dict]:
+        """Return only devices not already registered as config entries."""
+        known_ids = {entry.unique_id for entry in self._async_current_entries() if entry.unique_id}
+        return {
+            device_id: d
+            for d in devices
+            if (device_id := d.get("deviceId")) and f"dlight_{device_id}" not in known_ids
+        }
+
+    def _heal_known_lamps(self, devices: list[dict]) -> None:
+        """Update the stored IP for any known lamp found on a new address."""
         known = {entry.unique_id: entry for entry in self._async_current_entries()}
-        self._discovered = {}
         for found in devices:
             entry = known.get(f"dlight_{found['deviceId']}")
-            if entry is None:
-                self._discovered[found["deviceId"]] = found
-            elif entry.data.get(CONF_IP_ADDRESS) != found["ip_address"]:
+            if entry is not None and entry.data.get(CONF_IP_ADDRESS) != found["ip_address"]:
                 _LOGGER.info(
                     "dLight %s moved to %s; updating its config entry",
                     found["deviceId"],
@@ -138,10 +150,6 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
                 # Reload so the running coordinator targets the new address.
                 self.hass.config_entries.async_schedule_reload(entry.entry_id)
-
-        if self._discovered:
-            return await self.async_step_discovery()
-        return await self.async_step_discovery_none()
 
     async def async_step_discovery_none(
         self, user_input: dict[str, Any] | None = None
@@ -155,8 +163,24 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_retry(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Retry discovery from the discovery_none menu."""
-        return await self.async_step_user()
+        """Retry discovery without triggering IP self-healing for existing lamps.
+
+        The user clicked "Try again" to scan for *new* lamps, not to heal
+        existing entries — silently reloading a coordinator mid-use is an
+        unexpected side effect in this context.
+        """
+        try:
+            devices = await discover_devices(discovery_duration=DISCOVERY_DURATION)
+        except Exception:  # noqa: BLE001 — discovery is best-effort, never fatal
+            _LOGGER.exception("dLight discovery failed during retry; falling back to discovery_none")
+            devices = []
+
+        _LOGGER.debug("dLight retry discovery found %d device(s)", len(devices))
+        self._discovered = self._filter_new_devices(devices)
+
+        if self._discovered:
+            return await self.async_step_discovery()
+        return await self.async_step_discovery_none()
 
     async def async_step_discovery(
         self, user_input: dict[str, Any] | None = None

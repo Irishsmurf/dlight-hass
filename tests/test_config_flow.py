@@ -169,6 +169,52 @@ async def test_discovery_heals_changed_ip(hass):
     # ...but its stored IP has been refreshed
     assert entry.data[CONF_IP_ADDRESS] == "192.168.1.99"
 
+async def test_retry_does_not_heal_known_lamp_ip(hass):
+    """Regression for #50: async_step_retry must NOT update entries for known lamps.
+
+    When a user clicks "Try again" from discovery_none, the intent is to scan
+    for *new* lamps. If a known lamp appears on a new IP during that scan it
+    must be silently ignored — self-healing is reserved for the initial user
+    step so that an unexpected coordinator reload cannot fire mid-use.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_IP_ADDRESS: "192.168.1.10", CONF_DEVICE_ID: "known_id"},
+        title="Known Lamp",
+        unique_id="dlight_known_id",
+    )
+    entry.add_to_hass(hass)
+
+    # First init: no devices found → discovery_none
+    with patch("custom_components.dlight.config_flow.discover_devices", return_value=[]):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+    assert result["step_id"] == "discovery_none"
+
+    # Retry: known lamp appears on a new IP
+    mock_devices = [
+        {"deviceId": "known_id", "ip_address": "192.168.1.99", "deviceModel": "dLight"}
+    ]
+    with patch("custom_components.dlight.config_flow.discover_devices", return_value=mock_devices), \
+         patch.object(hass.config_entries, "async_update_entry") as mock_update, \
+         patch.object(hass.config_entries, "async_schedule_reload") as mock_reload:
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"next_step_id": "retry"},
+        )
+        await hass.async_block_till_done()
+
+    # The retry must not have healed the entry
+    mock_update.assert_not_called()
+    mock_reload.assert_not_called()
+    # Stored IP unchanged
+    assert entry.data[CONF_IP_ADDRESS] == "192.168.1.10"
+    # Known lamp was filtered out → still no new devices → discovery_none again
+    assert result["type"] == data_entry_flow.FlowResultType.MENU
+    assert result["step_id"] == "discovery_none"
+
+
 async def test_manual_readd_updates_ip(hass):
     """Manually re-adding a configured lamp aborts but heals its stored IP."""
     entry = MockConfigEntry(

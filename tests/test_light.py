@@ -955,6 +955,42 @@ async def test_physical_control_not_fired_during_transition(
     await entity._async_cancel_transition()
 
 
+async def test_failed_fade_does_not_fire_physical_control(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """A failed emulated transition must not fire a dlight_physical_control event."""
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data
+
+    events = []
+    hass.bus.async_listen(EVENT_PHYSICAL_CONTROL, lambda e: events.append(e))
+
+    # Inject a failure so the fade fails on the first step.
+    mock_dlight_device.set_brightness.side_effect = OSError("connection reset mid-fade")
+
+    # Start a minimal single-step fade (transition=0.5s → 1 step, no inter-step sleep).
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "brightness": 255, "transition": 0.5},
+        blocking=True,
+    )
+    # Let the background fade task run and reach the exception handler.
+    await hass.async_block_till_done()
+
+    # Simulate the coordinator polling the lamp; the polled state is unchanged.
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert events == [], (
+        f"Spurious physical_control event fired after failed fade: {events}"
+    )
+
+
 # --- Minimum brightness floor ---
 
 async def test_turn_on_brightness_below_floor_is_clamped(

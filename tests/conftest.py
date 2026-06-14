@@ -37,6 +37,7 @@ def mock_dlight_device():
         mock_device.ping = AsyncMock(return_value=True)
         mock_device.set_brightness = AsyncMock()
         mock_device.set_color_temperature = AsyncMock()
+        mock_device.apply_scene = AsyncMock()
         mock_device.flash = AsyncMock(return_value=True)
 
         # Track state change callbacks
@@ -97,6 +98,18 @@ def mock_dlight_device():
             state["color"]["temperature"] = k
             trigger_callbacks(old, copy.deepcopy(state))
         mock_device.set_color_temperature.side_effect = mock_set_color_temp
+
+        async def mock_apply_scene(brightness=None, temperature=None):
+            state = get_current_mock_state()
+            old = copy.deepcopy(state)
+            if brightness is not None:
+                state["brightness"] = brightness
+            if temperature is not None:
+                if "color" not in state:
+                    state["color"] = {}
+                state["color"]["temperature"] = temperature
+            trigger_callbacks(old, copy.deepcopy(state))
+        mock_device.apply_scene.side_effect = mock_apply_scene
 
         yield mock_device
 

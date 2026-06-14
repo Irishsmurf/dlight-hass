@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Use `DLightDevice.apply_scene()` to atomically apply brightness and color temperature in a single TCP command when both are set together, reducing connection overhead and enabling atomic rollback on failure.
 - Fire a `dlight_physical_control` HA event when a poll detects a state change that was not initiated by Home Assistant, enabling automations that respond to physical button presses or external control.
 - Integrate Codecov Flags (`coordinator`, `config_flow`, `light`, `button`, `binary_sensor`) for per-component coverage segmentation in CI.
 - Add Codecov component definitions (`coordinator`, `config_flow`, `light_entity`, `diagnostics`, `integration_init`) for per-feature coverage thresholds and targeted PR feedback.

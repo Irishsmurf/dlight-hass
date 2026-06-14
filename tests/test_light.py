@@ -56,9 +56,10 @@ async def test_light_turn_on(hass, mock_dlight_device, mock_config_entry):
         blocking=True,
     )
 
-    # Verify device methods were called
-    mock_dlight_device.set_brightness.assert_called_with(100)  # 255 is 100%
-    mock_dlight_device.set_color_temperature.assert_called_with(3000)
+    # Both brightness and kelvin provided: apply_scene must be used atomically.
+    mock_dlight_device.apply_scene.assert_called_once_with(brightness=100, temperature=3000)
+    mock_dlight_device.set_brightness.assert_not_called()
+    mock_dlight_device.set_color_temperature.assert_not_called()
 
     # Verify state
     state = hass.states.get("light.test_light")
@@ -617,6 +618,100 @@ async def test_turn_on_with_kelvin_while_off_sends_power_command(
     # turn_on() must be in the command batch regardless of optimistic overrides.
     mock_dlight_device.turn_on.assert_called_once()
     mock_dlight_device.set_color_temperature.assert_called_with(3000)
+
+
+# ---------------------------------------------------------------------------
+# apply_scene atomic command tests (issue #9)
+# ---------------------------------------------------------------------------
+
+
+async def test_turn_on_both_brightness_and_kelvin_uses_apply_scene(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """turn_on with both brightness and kelvin must use apply_scene (not two commands)."""
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "brightness": 128, "color_temp_kelvin": 4000},
+        blocking=True,
+    )
+
+    mock_dlight_device.apply_scene.assert_called_once_with(brightness=51, temperature=4000)
+    mock_dlight_device.set_brightness.assert_not_called()
+    mock_dlight_device.set_color_temperature.assert_not_called()
+
+
+async def test_turn_on_both_while_off_sends_power_then_apply_scene(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """turn_on(brightness=X, kelvin=K) while off must send turn_on() before apply_scene."""
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        LIGHT_DOMAIN, "turn_off", {"entity_id": "light.test_light"}, blocking=True
+    )
+    mock_dlight_device.turn_on.reset_mock()
+    mock_dlight_device.apply_scene.reset_mock()
+
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "brightness": 200, "color_temp_kelvin": 5000},
+        blocking=True,
+    )
+
+    mock_dlight_device.turn_on.assert_called_once()
+    mock_dlight_device.apply_scene.assert_called_once_with(brightness=79, temperature=5000)
+    mock_dlight_device.set_brightness.assert_not_called()
+    mock_dlight_device.set_color_temperature.assert_not_called()
+
+
+async def test_turn_on_only_brightness_does_not_use_apply_scene(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """turn_on with only brightness must use set_brightness, not apply_scene."""
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "brightness": 100},
+        blocking=True,
+    )
+
+    mock_dlight_device.apply_scene.assert_not_called()
+    mock_dlight_device.set_brightness.assert_called_once()
+
+
+async def test_turn_on_only_kelvin_does_not_use_apply_scene(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """turn_on with only color_temp_kelvin must use set_color_temperature, not apply_scene."""
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "color_temp_kelvin": 3500},
+        blocking=True,
+    )
+
+    mock_dlight_device.apply_scene.assert_not_called()
+    mock_dlight_device.set_color_temperature.assert_called_once_with(3500)
 
 
 # ---------------------------------------------------------------------------

@@ -53,15 +53,15 @@ async def test_connectivity_sensor_health_attributes_healthy(
 
     assert attrs["consecutive_failures"] == 0
     assert attrs["last_successful_poll"] is not None  # set by setup poll
-    assert attrs["rediscovery_triggered"] is False
+    assert attrs["rediscovery_in_progress"] is False
     assert attrs["poll_interval_seconds"] == POLL_INTERVAL
 
 
 async def test_connectivity_sensor_health_attributes_degraded(
     hass, mock_dlight_device, mock_config_entry
 ):
-    """consecutive_failures increments on poll errors; rediscovery_triggered flips at threshold."""
-    from unittest.mock import patch as _patch
+    """consecutive_failures increments on poll errors; rediscovery_in_progress reflects task state."""
+    from unittest.mock import AsyncMock, patch as _patch
 
     await setup_integration(hass, mock_config_entry)
     entity_id = er.async_get(hass).async_get_entity_id(
@@ -72,7 +72,7 @@ async def test_connectivity_sensor_health_attributes_degraded(
 
     mock_dlight_device.get_state.side_effect = DLightConnectionError("gone")
     # Suppress rediscovery so the test doesn't trigger an entry reload.
-    with _patch.object(coordinator, "_async_attempt_rediscovery", return_value=None):
+    with _patch.object(coordinator, "_async_attempt_rediscovery", new_callable=AsyncMock):
         for _ in range(REDISCOVERY_FAILURE_THRESHOLD):
             await coordinator.async_refresh()
             await hass.async_block_till_done()
@@ -82,16 +82,17 @@ async def test_connectivity_sensor_health_attributes_degraded(
     assert coordinator.consecutive_failures == REDISCOVERY_FAILURE_THRESHOLD
     assert coordinator.last_successful_poll is not None
     assert coordinator.last_successful_poll == last_good_poll
-    assert coordinator.consecutive_failures >= REDISCOVERY_FAILURE_THRESHOLD  # rediscovery_triggered
+    # No real rediscovery task was spawned (patched out), so rediscovery_in_progress is False.
+    assert coordinator.rediscovery_in_progress is False
 
-    # Recovery: failures reset, timestamp refreshes, rediscovery_triggered clears.
+    # Recovery: failures reset, timestamp refreshes, rediscovery_in_progress stays False.
     mock_dlight_device.get_state.side_effect = None
     await coordinator.async_refresh()
     await hass.async_block_till_done()
 
     attrs = hass.states.get(entity_id).attributes
     assert attrs["consecutive_failures"] == 0
-    assert attrs["rediscovery_triggered"] is False
+    assert attrs["rediscovery_in_progress"] is False
     assert attrs["last_successful_poll"] != last_good_poll
 
 

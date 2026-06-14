@@ -80,6 +80,11 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Return the timestamp of the last successful poll."""
         return self._last_successful_poll
 
+    @property
+    def rediscovery_in_progress(self) -> bool:
+        """Return True while a UDP rediscovery sweep task is actively running."""
+        return self._rediscovery_task is not None and not self._rediscovery_task.done()
+
     @callback
     def _handle_device_state_change(
         self,
@@ -221,37 +226,40 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._consecutive_failures,
         )
         try:
-            ping_ok = await self.device.ping(timeout=2.0)
-        except Exception:  # noqa: BLE001 — defensively catch any errors in ping
-            ping_ok = False
+            try:
+                ping_ok = await self.device.ping(timeout=2.0)
+            except Exception:  # noqa: BLE001 — defensively catch any errors in ping
+                ping_ok = False
 
-        if ping_ok:
-            _LOGGER.debug(
-                "dLight %s is reachable on current IP %s via ping; skipping UDP sweep",
-                self.device.id,
-                self.device.ip,
-            )
-            return
+            if ping_ok:
+                _LOGGER.debug(
+                    "dLight %s is reachable on current IP %s via ping; skipping UDP sweep",
+                    self.device.id,
+                    self.device.ip,
+                )
+                return
 
-        try:
-            async for found in discover_devices_stream(timeout=REDISCOVERY_DURATION):
-                if found.get("deviceId") != self.device.id:
-                    continue
-                new_ip = found.get("ip_address")
-                if new_ip and new_ip != self.device.ip:
-                    _LOGGER.info(
-                        "dLight %s found at new address %s (was %s); updating entry",
-                        self.device.id,
-                        new_ip,
-                        self.device.ip,
-                    )
-                    self.hass.config_entries.async_update_entry(
-                        self.config_entry,
-                        data={**self.config_entry.data, CONF_IP_ADDRESS: new_ip},
-                    )
-                    self.hass.config_entries.async_schedule_reload(
-                        self.config_entry.entry_id
-                    )
-                break
-        except Exception:  # noqa: BLE001 — best-effort recovery, never raise
-            _LOGGER.debug("dLight rediscovery sweep failed", exc_info=True)
+            try:
+                async for found in discover_devices_stream(timeout=REDISCOVERY_DURATION):
+                    if found.get("deviceId") != self.device.id:
+                        continue
+                    new_ip = found.get("ip_address")
+                    if new_ip and new_ip != self.device.ip:
+                        _LOGGER.info(
+                            "dLight %s found at new address %s (was %s); updating entry",
+                            self.device.id,
+                            new_ip,
+                            self.device.ip,
+                        )
+                        self.hass.config_entries.async_update_entry(
+                            self.config_entry,
+                            data={**self.config_entry.data, CONF_IP_ADDRESS: new_ip},
+                        )
+                        self.hass.config_entries.async_schedule_reload(
+                            self.config_entry.entry_id
+                        )
+                    break
+            except Exception:  # noqa: BLE001 — best-effort recovery, never raise
+                _LOGGER.debug("dLight rediscovery sweep failed", exc_info=True)
+        finally:
+            self.async_update_listeners()

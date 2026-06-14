@@ -58,7 +58,7 @@ The **Connectivity** binary sensor exposes health metrics in its state attribute
 |---|---|
 | `consecutive_failures` | How many polls have failed in a row. Resets to `0` on success. |
 | `last_successful_poll` | Timestamp of the last poll that got a response. `None` until the first success. |
-| `rediscovery_triggered` | `true` after 3 consecutive failures — a UDP rediscovery sweep is in flight. |
+| `rediscovery_in_progress` | `true` while a UDP rediscovery sweep task is actively running. |
 | `poll_interval_seconds` | How frequently the lamp is polled (default 30 s). |
 
 A lamp that's been offline for 3 polls (~90 s) automatically triggers a rediscovery sweep. If it answers from a new IP, the entry is updated and the coordinator resumes without any manual steps.

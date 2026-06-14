@@ -62,6 +62,11 @@
                 "name": "Température de couleur"
             }
         },
+        "update": {
+            "firmware": {
+                "name": "Micrologiciel"
+            }
+        },
         "event": {
             "physical_control": {
                 "name": "Commande physique",

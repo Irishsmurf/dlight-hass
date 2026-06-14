@@ -266,6 +266,11 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             await self.async_turn_off(**kwargs)
             return
 
+        # Clamp to the minimum safe brightness floor (device-percent level).
+        if brightness is not None:
+            clamped_pct = max(_to_dlight_brightness(brightness), MIN_BRIGHTNESS_PCT)
+            brightness = math.floor(clamped_pct / 100 * 255)
+
         # The newest command always wins over a fade already in flight.
         await self._async_cancel_transition()
 
@@ -306,16 +311,14 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         if brightness is not None and kelvin is not None:
             commands.append(
                 self.device.apply_scene(
-                    brightness=_apply_brightness_floor(_to_dlight_brightness(brightness)),
+                    brightness=_to_dlight_brightness(brightness),
                     temperature=int(kelvin),
                 )
             )
         else:
             if brightness is not None:
                 commands.append(
-                    self.device.set_brightness(
-                        _apply_brightness_floor(_to_dlight_brightness(brightness))
-                    )
+                    self.device.set_brightness(_to_dlight_brightness(brightness))
                 )
             if kelvin is not None:
                 commands.append(self.device.set_color_temperature(int(kelvin)))
@@ -544,7 +547,8 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                 )
                 commands = []
                 if pct is not None:
-                    commands.append(self.device.set_brightness(_apply_brightness_floor(pct)))
+                    pct = _apply_brightness_floor(pct)
+                    commands.append(self.device.set_brightness(pct))
                 if kelvin is not None:
                     commands.append(self.device.set_color_temperature(kelvin))
                 if not commands:

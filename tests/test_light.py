@@ -1,4 +1,5 @@
 import asyncio
+import math
 
 import pytest
 from unittest.mock import patch
@@ -975,6 +976,9 @@ async def test_turn_on_brightness_below_floor_is_clamped(
 
     # brightness=1 on HA scale is ceil(1/255*100)=1% device → clamped to MIN_BRIGHTNESS_PCT
     mock_dlight_device.set_brightness.assert_called_with(MIN_BRIGHTNESS_PCT)
+    # State reflects the clamped floor: device returns 5% → _to_ha_brightness(5) = ceil(12.75) = 13
+    state = hass.states.get("light.test_light")
+    assert state.attributes.get("brightness") == math.ceil(MIN_BRIGHTNESS_PCT / 100 * 255)
 
 
 async def test_turn_off_ignores_brightness_floor(

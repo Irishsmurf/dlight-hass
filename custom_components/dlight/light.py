@@ -284,18 +284,31 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
             self._optimistic_kelvin = KELVIN_MIN  # unknown -> assume warm
         self.async_write_ha_state()
 
-        commands = []
-        if brightness is not None:
+        # When both brightness and temperature are set atomically, apply_scene
+        # reduces two TCP commands to one and rolls back both on failure.
+        if brightness is not None and kelvin is not None:
+            commands = []
+            if not was_on:
+                commands.append(self.device.turn_on())
             commands.append(
-                self.device.set_brightness(_to_dlight_brightness(brightness))
+                self.device.apply_scene(
+                    brightness=_to_dlight_brightness(brightness),
+                    temperature=int(kelvin),
+                )
             )
-        if kelvin is not None:
-            commands.append(self.device.set_color_temperature(int(kelvin)))
-        # Setting brightness/temperature implicitly powers the lamp on, so the
-        # explicit power command is only needed for a bare turn_on call, or
-        # when the lamp is (as far as we know) currently off.
-        if not commands or not was_on:
-            commands.insert(0, self.device.turn_on())
+        else:
+            commands = []
+            if brightness is not None:
+                commands.append(
+                    self.device.set_brightness(_to_dlight_brightness(brightness))
+                )
+            if kelvin is not None:
+                commands.append(self.device.set_color_temperature(int(kelvin)))
+            # Setting brightness/temperature implicitly powers the lamp on, so the
+            # explicit power command is only needed for a bare turn_on call, or
+            # when the lamp is (as far as we know) currently off.
+            if not commands or not was_on:
+                commands.insert(0, self.device.turn_on())
 
         try:
             await self._send(commands)

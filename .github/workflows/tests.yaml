@@ -31,7 +31,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest --cov=custom_components/dlight --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
+          pytest --cov=custom_components/dlight --cov-report=term-missing --cov-report=xml --cov-fail-under=80 --junitxml=junit.xml -o junit_family=legacy
 
       - name: Upload coverage to Codecov (aggregate)
         uses: codecov/codecov-action@v4

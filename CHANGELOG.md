@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Add `--cov-fail-under=80` coverage gate and `--cov-report=term-missing` summary to the CI pytest job; PRs that drop overall coverage below 80% now fail with a clear per-module report (closes #62).
+
 ### Fixed
 - Redact `macAddress` in diagnostics download by adding it to `TO_REDACT` and passing `coordinator.info` through `async_redact_data` (closes #59).
 - Log all exceptions from a failed `_send()` batch before re-raising the first, so compound device failures (e.g. simultaneous `turn_on` + `set_brightness` errors) are fully visible in the HA log (closes #60).

@@ -67,69 +67,69 @@ This entity can be used directly as an **event trigger** in automations — no t
 
 ```yaml
 automation:
-  alias: "Desk Lamp — physical on notification"
-  trigger:
-    - platform: event
-      event_type: dlight_physical_control
-      event_data:
-        device_id: "abc123"
-        action: "turned_on"
-  action:
-    - service: notify.mobile_app_my_phone
-      data:
-        message: "Desk lamp was turned on physically."
+  - alias: "Desk Lamp — physical on notification"
+    trigger:
+      - platform: event
+        event_type: dlight_physical_control
+        event_data:
+          device_id: "abc123"
+          action: "turned_on"
+    action:
+      - service: notify.mobile_app_my_phone
+        data:
+          message: "Desk lamp was turned on physically."
 ```
 
 ### 2. Turn off all other lights when the lamp is physically turned off
 
 ```yaml
 automation:
-  alias: "Desk Lamp — physical off cascades"
-  trigger:
-    - platform: event
-      event_type: dlight_physical_control
-      event_data:
-        device_id: "abc123"
-        action: "turned_off"
-  action:
-    - service: light.turn_off
-      target:
-        area_id: office
+  - alias: "Desk Lamp — physical off cascades"
+    trigger:
+      - platform: event
+        event_type: dlight_physical_control
+        event_data:
+          device_id: "abc123"
+          action: "turned_off"
+    action:
+      - service: light.turn_off
+        target:
+          area_id: office
 ```
 
 ### 3. Log brightness changes to a helper
 
 ```yaml
 automation:
-  alias: "Desk Lamp — log brightness changes"
-  trigger:
-    - platform: event
-      event_type: dlight_physical_control
-      event_data:
-        device_id: "abc123"
-        action: "changed"
-  action:
-    - service: input_text.set_value
-      target:
-        entity_id: input_text.lamp_last_brightness_change
-      data:
-        value: >
-          {{ trigger.event.data.new_state.brightness }}% at {{ now().strftime('%H:%M') }}
+  - alias: "Desk Lamp — log brightness changes"
+    trigger:
+      - platform: event
+        event_type: dlight_physical_control
+        event_data:
+          device_id: "abc123"
+          action: "changed"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.lamp_last_brightness_change
+        data:
+          value: >
+            {{ trigger.event.data.new_state.brightness }}% at {{ now().strftime('%H:%M') }}
 ```
 
 ### 4. Using the Physical Control entity trigger (UI-friendly)
 
 ```yaml
 automation:
-  alias: "Desk Lamp — entity event trigger"
-  trigger:
-    - platform: state
-      entity_id: event.desk_lamp_physical_control
-  action:
-    - service: notify.mobile_app_my_phone
-      data:
-        message: >
-          Desk lamp: {{ trigger.to_state.attributes.event_type }}
+  - alias: "Desk Lamp — entity event trigger"
+    trigger:
+      - platform: state
+        entity_id: event.desk_lamp_physical_control
+    action:
+      - service: notify.mobile_app_my_phone
+        data:
+          message: >
+            Desk lamp: {{ trigger.to_state.attributes.event_type }}
 ```
 
 ---

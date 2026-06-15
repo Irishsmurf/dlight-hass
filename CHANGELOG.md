@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Enrich diagnostics snapshot with a `coordinator_health` dict containing `consecutive_failures` (int), `last_success` (ISO timestamp or null), and `rediscovery_in_flight` (bool); no IP addresses are included in the new fields (closes #75).
+
 ### Fixed
 - Clamp `color_temp_kelvin` to `[KELVIN_MIN, KELVIN_MAX]` in `async_turn_on` before issuing device commands; out-of-range values (e.g. 6500 K daylight preset) are silently bounded to the hardware range instead of triggering undefined device behaviour (closes #77).
 

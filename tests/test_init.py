@@ -6,9 +6,11 @@ from dlightclient import DLightConnectionError
 from homeassistant.config_entries import ConfigEntryNotReady
 from homeassistant.const import CONF_IP_ADDRESS
 from homeassistant.exceptions import ConfigEntryError
+from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.dlight.const import CONF_DEVICE_ID, DOMAIN
+from custom_components.dlight import SERVICE_FLASH
 from .conftest import setup_integration
 
 
@@ -110,3 +112,59 @@ async def test_setup_entry_raises_config_entry_error_on_missing_device_id(hass, 
 
     assert result is False
     assert bad_entry.state.value == "setup_error"
+
+
+# ---------------------------------------------------------------------------
+# dlight.flash service tests (issue #78)
+# ---------------------------------------------------------------------------
+
+
+async def test_flash_service_registered_on_setup(hass, mock_dlight_device, mock_config_entry):
+    """dlight.flash service is registered after a successful entry setup."""
+    await setup_integration(hass, mock_config_entry)
+    assert hass.services.has_service(DOMAIN, SERVICE_FLASH)
+
+
+async def test_flash_service_calls_device_flash(hass, mock_dlight_device, mock_config_entry):
+    """Calling dlight.flash finds the coordinator and calls device.flash()."""
+    mock_dlight_device.flash.return_value = True
+    await setup_integration(hass, mock_config_entry)
+
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_device(identifiers={(DOMAIN, "test_device_id")})
+    assert device is not None
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_FLASH,
+        {"device_id": device.id},
+        blocking=True,
+    )
+
+    mock_dlight_device.flash.assert_called_once()
+
+
+async def test_flash_service_unknown_device_raises(hass, mock_dlight_device, mock_config_entry):
+    """Calling dlight.flash with an unknown device_id raises ServiceValidationError."""
+    from homeassistant.exceptions import ServiceValidationError
+
+    await setup_integration(hass, mock_config_entry)
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_FLASH,
+            {"device_id": "nonexistent-device-id"},
+            blocking=True,
+        )
+
+
+async def test_flash_service_removed_on_last_entry_unload(hass, mock_dlight_device, mock_config_entry):
+    """dlight.flash service is removed when the last entry is unloaded."""
+    await setup_integration(hass, mock_config_entry)
+    assert hass.services.has_service(DOMAIN, SERVICE_FLASH)
+
+    assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert not hass.services.has_service(DOMAIN, SERVICE_FLASH)

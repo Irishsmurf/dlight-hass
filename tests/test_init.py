@@ -159,6 +159,26 @@ async def test_flash_service_unknown_device_raises(hass, mock_dlight_device, moc
         )
 
 
+async def test_flash_service_raises_on_device_flash_failure(hass, mock_dlight_device, mock_config_entry):
+    """dlight.flash raises HomeAssistantError when flash() returns False."""
+    from homeassistant.exceptions import HomeAssistantError
+
+    mock_dlight_device.flash.return_value = False
+    await setup_integration(hass, mock_config_entry)
+
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_device(identifiers={(DOMAIN, "test_device_id")})
+    assert device is not None
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_FLASH,
+            {"device_id": device.id},
+            blocking=True,
+        )
+
+
 async def test_flash_service_removed_on_last_entry_unload(hass, mock_dlight_device, mock_config_entry):
     """dlight.flash service is removed when the last entry is unloaded."""
     await setup_integration(hass, mock_config_entry)

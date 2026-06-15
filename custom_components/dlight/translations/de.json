@@ -102,7 +102,13 @@
     "services": {
         "flash": {
             "name": "Blinken",
-            "description": "Lässt die Lampe kurz aufleuchten, um sie physisch im Raum zu identifizieren."
+            "description": "Lässt die Lampe kurz aufleuchten, um sie physisch im Raum zu identifizieren.",
+            "fields": {
+                "device_id": {
+                    "name": "Gerät",
+                    "description": "Die dLight-Lampe, die blinken soll."
+                }
+            }
         }
     }
 }

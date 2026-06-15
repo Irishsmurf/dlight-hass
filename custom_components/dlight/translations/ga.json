@@ -102,7 +102,13 @@
     "services": {
         "flash": {
             "name": "Splancadh",
-            "description": "Caochnaíonn an lampa go gairid chun é a aithint go fisiciúil sa seomra."
+            "description": "Caochnaíonn an lampa go gairid chun é a aithint go fisiciúil sa seomra.",
+            "fields": {
+                "device_id": {
+                    "name": "Gléas",
+                    "description": "An lampa dLight atá le caochadh."
+                }
+            }
         }
     }
 }

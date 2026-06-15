@@ -12,7 +12,7 @@ from dlightclient import AsyncDLightClient, DLightDevice
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_IP_ADDRESS
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ConfigEntryError, ServiceValidationError
+from homeassistant.exceptions import ConfigEntryError, HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 
 from .const import CONF_DEVICE_ID, DOMAIN, PLATFORMS
@@ -71,7 +71,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
         async def _handle_flash(call: ServiceCall) -> None:
             target_device_id: str | None = call.data.get("device_id")
             if not target_device_id:
-                return
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="flash_unknown_device",
+                    translation_placeholders={"device_id": ""},
+                )
             dev_reg = dr.async_get(hass)
             device_entry = dev_reg.async_get(target_device_id)
             if not device_entry:
@@ -83,13 +87,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
             for entry_id in device_entry.config_entries:
                 cfg = hass.config_entries.async_get_entry(entry_id)
                 if cfg and cfg.domain == DOMAIN and cfg.runtime_data is not None:
-                    coord = cfg.runtime_data
+                    coord: DLightCoordinator = cfg.runtime_data
+                    device = coord.device
                     coord.identify_in_progress = True
                     try:
                         async with coord.command_lock:
-                            await coord.device.flash()
+                            success = await device.flash()
+                    except Exception as err:
+                        _LOGGER.exception("Flash service failed for dLight %s", device.id)
+                        raise HomeAssistantError(
+                            translation_domain=DOMAIN,
+                            translation_key="identify_failed",
+                            translation_placeholders={
+                                "device_name": cfg.title or f"dLight {device.id}",
+                                "error": str(err),
+                            },
+                        ) from err
                     finally:
                         coord.identify_in_progress = False
+                    if not success:
+                        raise HomeAssistantError(
+                            translation_domain=DOMAIN,
+                            translation_key="identify_failed",
+                            translation_placeholders={
+                                "device_name": cfg.title or f"dLight {device.id}",
+                                "error": "flash sequence did not complete",
+                            },
+                        )
                     return
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
@@ -100,10 +124,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
         hass.services.async_register(DOMAIN, SERVICE_FLASH, _handle_flash)
 
     def _maybe_remove_service() -> None:
-        remaining = [
-            e for e in hass.config_entries.async_entries(DOMAIN)
-            if e.entry_id != entry.entry_id
-        ]
+        remaining = []
+        for e in hass.config_entries.async_entries(DOMAIN):
+            if e.entry_id == entry.entry_id:
+                continue
+            try:
+                # Only count entries that completed setup successfully.
+                if e.runtime_data is not None:
+                    remaining.append(e)
+            except Exception:  # noqa: BLE001
+                pass
         if not remaining and hass.services.has_service(DOMAIN, SERVICE_FLASH):
             hass.services.async_remove(DOMAIN, SERVICE_FLASH)
 

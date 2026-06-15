@@ -102,7 +102,13 @@
     "services": {
         "flash": {
             "name": "Clignoter",
-            "description": "Fait clignoter brièvement la lampe pour l'identifier physiquement dans une pièce."
+            "description": "Fait clignoter brièvement la lampe pour l'identifier physiquement dans une pièce.",
+            "fields": {
+                "device_id": {
+                    "name": "Appareil",
+                    "description": "La lampe dLight à faire clignoter."
+                }
+            }
         }
     }
 }

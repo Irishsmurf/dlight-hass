@@ -69,6 +69,24 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: binary_sensor
 
+      - name: Upload coverage — sensor flag
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: sensor
+
+      - name: Upload coverage — event flag
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: event
+
+      - name: Upload coverage — update flag
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: update
+
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1

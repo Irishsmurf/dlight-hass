@@ -22,6 +22,15 @@ flags:
   binary_sensor:
     paths:
       - custom_components/dlight/binary_sensor.py
+  sensor:
+    paths:
+      - custom_components/dlight/sensor.py
+  event:
+    paths:
+      - custom_components/dlight/event.py
+  update:
+    paths:
+      - custom_components/dlight/update.py
 
 component_management:
   default_rules:
@@ -53,3 +62,15 @@ component_management:
       paths:
         - custom_components/dlight/__init__.py
         - custom_components/dlight/const.py
+    - component_id: sensor
+      name: Sensor
+      paths:
+        - custom_components/dlight/sensor.py
+    - component_id: event
+      name: Event
+      paths:
+        - custom_components/dlight/event.py
+    - component_id: update
+      name: Update
+      paths:
+        - custom_components/dlight/update.py

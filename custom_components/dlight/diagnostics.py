@@ -23,6 +23,7 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     """Return a redacted snapshot of the entry and its coordinator."""
     coordinator = entry.runtime_data
+    last_success = coordinator.last_successful_poll
     return {
         "entry": {
             "data": async_redact_data(dict(entry.data), TO_REDACT),
@@ -32,4 +33,9 @@ async def async_get_config_entry_diagnostics(
         "state": coordinator.data,  # last polled on/brightness/color
         "last_update_success": coordinator.last_update_success,
         "update_interval": str(coordinator.update_interval),
+        "coordinator_health": {
+            "consecutive_failures": coordinator.consecutive_failures,
+            "last_success": last_success.isoformat() if last_success else None,
+            "rediscovery_in_flight": coordinator.rediscovery_in_progress,
+        },
     }

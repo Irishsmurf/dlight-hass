@@ -110,3 +110,17 @@ async def test_setup_entry_raises_config_entry_error_on_missing_device_id(hass, 
 
     assert result is False
     assert bad_entry.state.value == "setup_error"
+
+
+async def test_options_change_triggers_entry_reload(hass, mock_dlight_device, mock_config_entry):
+    """Saving options (e.g. poll_interval) triggers a reload of the config entry."""
+    await setup_integration(hass, mock_config_entry)
+
+    with patch.object(hass.config_entries, "async_reload", return_value=True) as mock_reload:
+        # async_update_entry is sync in HA; it fires all registered update_listeners.
+        hass.config_entries.async_update_entry(
+            mock_config_entry, options={"poll_interval": 15}
+        )
+        await hass.async_block_till_done()
+
+    mock_reload.assert_called_once_with(mock_config_entry.entry_id)

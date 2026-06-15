@@ -21,6 +21,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
+from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
 from dlightclient import (
     STATUS_SUCCESS,
     AsyncDLightClient,
@@ -101,6 +102,14 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """UI flow: try network discovery first, fall back to a manual form."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> DLightOptionsFlowHandler:
+        """Return an options flow handler for this entry."""
+        return DLightOptionsFlowHandler()
 
     def __init__(self) -> None:
         """Initialize the flow with an empty discovery cache."""
@@ -276,14 +285,6 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
         return self.async_abort(reason="unknown_device")
 
-    @staticmethod
-    @callback
-    def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> DLightOptionsFlowHandler:
-        """Return an options flow handler for this entry."""
-        return DLightOptionsFlowHandler()
-
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -330,13 +331,19 @@ class DLightOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Show the poll interval selector."""
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            return self.async_create_entry(
+                data={CONF_POLL_INTERVAL: int(user_input[CONF_POLL_INTERVAL])}
+            )
 
         current = self.config_entry.options.get(CONF_POLL_INTERVAL, POLL_INTERVAL)
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
-                {vol.Required(CONF_POLL_INTERVAL, default=current): vol.In(_POLL_INTERVAL_OPTIONS)}
+                {
+                    vol.Required(CONF_POLL_INTERVAL, default=str(current)): SelectSelector(
+                        SelectSelectorConfig(options=[str(v) for v in _POLL_INTERVAL_OPTIONS])
+                    )
+                }
             ),
         )
 

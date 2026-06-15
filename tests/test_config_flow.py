@@ -351,7 +351,7 @@ async def test_options_flow_shows_init_form(hass):
 
 
 async def test_options_flow_stores_selected_preset(hass):
-    """Submitting a poll interval preset saves it to entry options."""
+    """Submitting a poll interval preset saves it as an integer in entry options."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_IP_ADDRESS: "192.168.1.10", CONF_DEVICE_ID: "test_id"},
@@ -361,8 +361,9 @@ async def test_options_flow_stores_selected_preset(hass):
     entry.add_to_hass(hass)
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    # SelectSelector sends string values; the handler coerces to int on save.
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], user_input={"poll_interval": 15}
+        result["flow_id"], user_input={"poll_interval": "15"}
     )
 
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
@@ -383,15 +384,14 @@ async def test_options_flow_all_presets_valid(hass):
         entry.add_to_hass(hass)
         result = await hass.config_entries.options.async_init(entry.entry_id)
         result = await hass.config_entries.options.async_configure(
-            result["flow_id"], user_input={"poll_interval": preset}
+            result["flow_id"], user_input={"poll_interval": str(preset)}
         )
         assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
         assert result["data"]["poll_interval"] == preset
 
 
 async def test_options_flow_defaults_to_current_option(hass):
-    """Re-opening the options flow defaults to the previously saved interval."""
-    from datetime import timedelta
+    """Re-opening the options flow defaults to the previously saved interval (as string for SelectSelector)."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_IP_ADDRESS: "192.168.1.10", CONF_DEVICE_ID: "test_id"},
@@ -405,7 +405,8 @@ async def test_options_flow_defaults_to_current_option(hass):
     assert result["type"] == data_entry_flow.FlowResultType.FORM
     schema = result["data_schema"].schema
     key = next(k for k in schema if hasattr(k, "default"))
-    assert key.default() == 60
+    # SelectSelector uses string values; the default reflects str(saved_int).
+    assert key.default() == "60"
 
 # --- DHCP discovery -------------------------------------------------------
 

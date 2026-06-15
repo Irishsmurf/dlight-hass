@@ -4,8 +4,9 @@ The coordinator fetches swVersion once during setup and caches it in
 coordinator.info. The entity surfaces that as `installed_version`; no OTA
 source is currently known so `latest_version` is always None.
 
-The entity inherits CoordinatorEntity so it goes unavailable when the lamp
-drops off the network (coordinator.last_update_success is False).
+The entity overrides `available` to stay True whenever swVersion is cached,
+even when the lamp is temporarily unreachable. Firmware version is static
+metadata — hiding a known fact due to transient connectivity loss is unhelpful.
 """
 from __future__ import annotations
 
@@ -53,6 +54,16 @@ class DLightUpdateEntity(CoordinatorEntity[DLightCoordinator], UpdateEntity):
             identifiers={(DOMAIN, device.id)},
             name=entry.title or f"dLight {device.id}",
         )
+
+    @property
+    def available(self) -> bool:
+        """Return True when a cached firmware version exists.
+
+        coordinator.info is fetched once at setup and never changes, so
+        swVersion remains known even when the lamp is unreachable. Hiding a
+        known static fact because of a transient connectivity loss is unhelpful.
+        """
+        return bool(self.coordinator.info.get("swVersion"))
 
     @property
     def installed_version(self) -> str | None:

@@ -17,7 +17,7 @@ The snapshot contains just enough to debug, and nothing that identifies you:
 | Field | Contents |
 |---|---|
 | `entry.data` | Config entry data, **with IP address and device ID redacted**. |
-| `entry.options` | Entry options (there are none; the integration has no options flow). |
+| `entry.options` | Entry options — contains `poll_interval` (15 / 30 / 60 s) if the user has configured it; otherwise empty. |
 | `device_info` | Model, firmware, and hardware versions reported by the lamp. |
 | `state` | The last polled state — on/off, brightness, color temperature. |
 | `last_update_success` | Whether the most recent poll succeeded. |

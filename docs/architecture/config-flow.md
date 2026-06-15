@@ -1,6 +1,6 @@
 # Config Flow & IP Self-Healing
 
-`config_flow.py` drives setup entirely through the UI — there is **no YAML and no options flow**. It also carries the logic that keeps each entry pointed at the right IP after DHCP changes the lamp's address.
+`config_flow.py` drives setup entirely through the UI — there is **no YAML**. An **options flow** lets users choose the poll interval (15 s / 30 s / 60 s); changing the setting reloads the entry so the coordinator picks up the new interval immediately. The file also carries the logic that keeps each entry pointed at the right IP after DHCP changes the lamp's address.
 
 ## Flow map
 

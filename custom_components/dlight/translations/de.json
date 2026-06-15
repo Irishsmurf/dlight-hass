@@ -53,6 +53,20 @@
             "unknown_device": "Dieses Netzwerkgerät entspricht keiner konfigurierten dLight-Lampe."
         }
     },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Abfrageintervall",
+                "description": "Wähle, wie oft die Integration den Status jeder Lampe abfragt.",
+                "data": {
+                    "poll_interval": "Abfrageintervall (Sekunden)"
+                },
+                "data_description": {
+                    "poll_interval": "15 s für reaktionsschnelle Physische-Taste-Erkennung; 30 s als ausgewogener Standard; 60 s für Dauerlicht in wenig frequentierten Räumen."
+                }
+            }
+        }
+    },
     "entity": {
         "sensor": {
             "brightness": {

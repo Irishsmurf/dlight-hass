@@ -7,7 +7,7 @@ The integration follows Home Assistant's modern **coordinator + entity** pattern
 - **One config entry per physical lamp**, unique ID `dlight_<device_id>`.
 - **Local only.** UDP discovery + persistent TCP commands via [`dlight-client`](https://pypi.org/project/dlight-client/). No cloud.
 - **Single owner of I/O.** One `DLightCoordinator` per lamp owns the device handle, polling, and a command lock. Entities never talk to the lamp directly except through it.
-- **Config-flow only.** No YAML, no options flow (the poll interval is fixed by design — [ADR-0010](#design-decisions)).
+- **Config-flow only.** No YAML. An options flow offers three poll-interval presets (15 s / 30 s / 60 s); changing the setting reloads the entry so the coordinator picks up the new interval immediately.
 - **Optimistic UX, authoritative polling.** The UI reacts instantly; periodic polls reconcile against device truth.
 
 ## Module map
@@ -71,7 +71,7 @@ A confirmed poll reconciles (2) against (1), with guards so a stale poll can't u
 
 ## Design decisions
 
-Architectural decisions are recorded as ADRs in the repository (e.g. **ADR-0010** removed the options flow and fixed the poll interval). When a change alters a documented decision, update or add an ADR alongside the code.
+Architectural decisions are recorded as ADRs in the repository. When a change alters a documented decision, update or add an ADR alongside the code. (Note: ADR-0010 previously removed the options flow; issue #79 reinstated a minimal preset-based options flow for the poll interval.)
 
 ## Dive deeper
 

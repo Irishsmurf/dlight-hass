@@ -335,13 +335,78 @@ async def test_flow_reconfigure_rejects_different_lamp(hass):
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "unique_id_mismatch"
 
-async def test_no_options_flow(hass):
-    """Regression: the options flow was removed (ADR-0010), and a leftover
-    async_get_options_flow hook would make HA render a broken Configure button."""
-    from custom_components.dlight.config_flow import DLightConfigFlow
+async def test_options_flow_shows_init_form(hass):
+    """Opening the options flow displays the poll interval selector."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_IP_ADDRESS: "192.168.1.10", CONF_DEVICE_ID: "test_id"},
+        title="Test Lamp",
+        unique_id="dlight_test_id",
+    )
+    entry.add_to_hass(hass)
 
-    entry = MockConfigEntry(domain=DOMAIN)
-    assert not DLightConfigFlow.async_supports_options_flow(entry)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "init"
+
+
+async def test_options_flow_stores_selected_preset(hass):
+    """Submitting a poll interval preset saves it as an integer in entry options."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_IP_ADDRESS: "192.168.1.10", CONF_DEVICE_ID: "test_id"},
+        title="Test Lamp",
+        unique_id="dlight_test_id",
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    # SelectSelector sends string values; the handler coerces to int on save.
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"poll_interval": "15"}
+    )
+
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"] == {"poll_interval": 15}
+
+
+async def test_options_flow_all_presets_valid(hass):
+    """All three preset values (15, 30, 60) are accepted by the options flow."""
+    from custom_components.dlight.config_flow import _POLL_INTERVAL_OPTIONS
+
+    for preset in _POLL_INTERVAL_OPTIONS:
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={CONF_IP_ADDRESS: "192.168.1.10", CONF_DEVICE_ID: f"lamp_{preset}"},
+            title=f"Lamp {preset}",
+            unique_id=f"dlight_lamp_{preset}",
+        )
+        entry.add_to_hass(hass)
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], user_input={"poll_interval": str(preset)}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+        assert result["data"]["poll_interval"] == preset
+
+
+async def test_options_flow_defaults_to_current_option(hass):
+    """Re-opening the options flow defaults to the previously saved interval (as string for SelectSelector)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_IP_ADDRESS: "192.168.1.10", CONF_DEVICE_ID: "test_id"},
+        options={"poll_interval": 60},
+        title="Test Lamp",
+        unique_id="dlight_test_id2",
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    schema = result["data_schema"].schema
+    key = next(k for k in schema if hasattr(k, "default"))
+    # SelectSelector uses string values; the default reflects str(saved_int).
+    assert key.default() == "60"
 
 # --- DHCP discovery -------------------------------------------------------
 

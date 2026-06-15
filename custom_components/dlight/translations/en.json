@@ -53,6 +53,20 @@
             "unknown_device": "This network device does not match any configured dLight lamp."
         }
     },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Poll interval",
+                "description": "Choose how often the integration polls each lamp for its current state.",
+                "data": {
+                    "poll_interval": "Poll interval (seconds)"
+                },
+                "data_description": {
+                    "poll_interval": "15 s for responsive physical-button detection; 30 s for a balanced default; 60 s for always-on lamps in low-traffic rooms."
+                }
+            }
+        }
+    },
     "entity": {
         "sensor": {
             "brightness": {

@@ -53,6 +53,20 @@
             "unknown_device": "このネットワークデバイスは、設定済みのdLightランプと一致しません。"
         }
     },
+    "options": {
+        "step": {
+            "init": {
+                "title": "ポーリング間隔",
+                "description": "各ランプの現在の状態をポーリングする頻度を選択します。",
+                "data": {
+                    "poll_interval": "ポーリング間隔（秒）"
+                },
+                "data_description": {
+                    "poll_interval": "15 秒: 物理ボタンの検出を素早く反映; 30 秒: バランスの取れたデフォルト; 60 秒: トラフィックの少ない部屋の常時点灯ランプ向け。"
+                }
+            }
+        }
+    },
     "entity": {
         "sensor": {
             "brightness": {

@@ -66,6 +66,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
         )
     )
 
+    # Reload the entry whenever the user changes options (e.g. poll interval),
+    # so the coordinator picks up the new update_interval on re-setup.
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+
     # Register the dlight.flash service once; idempotent across multi-lamp setups.
     if not hass.services.has_service(DOMAIN, SERVICE_FLASH):
         async def _handle_flash(call: ServiceCall) -> None:
@@ -147,6 +151,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def async_reload_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> None:
+    """Reload when options change so the coordinator uses the updated poll interval."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bool:

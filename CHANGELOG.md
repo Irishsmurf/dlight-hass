@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add `OptionsFlowHandler` to `config_flow.py` with three poll-interval presets (15 s / 30 s / 60 s); `DLightCoordinator` reads `entry.options.get("poll_interval", POLL_INTERVAL)` on init so a saved change triggers an entry reload and the new interval takes effect immediately (closes #79).
 - Add `dlight.flash` service to `__init__.py`; accepts a `device_id` and calls `device.flash()` under `coordinator.command_lock` — enables automation-triggered lamp identification without targeting the button entity (closes #78).
 
 ### Changed

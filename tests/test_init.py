@@ -179,6 +179,72 @@ async def test_flash_service_raises_on_device_flash_failure(hass, mock_dlight_de
         )
 
 
+async def test_flash_service_raises_on_empty_device_id(hass, mock_dlight_device, mock_config_entry):
+    """dlight.flash raises ServiceValidationError when called with an empty device_id."""
+    from homeassistant.exceptions import ServiceValidationError
+
+    await setup_integration(hass, mock_config_entry)
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_FLASH,
+            {"device_id": ""},
+            blocking=True,
+        )
+
+
+async def test_flash_service_raises_on_device_flash_exception(hass, mock_dlight_device, mock_config_entry):
+    """dlight.flash raises HomeAssistantError when flash() throws an exception."""
+    from homeassistant.exceptions import HomeAssistantError
+
+    mock_dlight_device.flash.side_effect = Exception("device exploded")
+    await setup_integration(hass, mock_config_entry)
+
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_device(identifiers={(DOMAIN, "test_device_id")})
+    assert device is not None
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_FLASH,
+            {"device_id": device.id},
+            blocking=True,
+        )
+
+
+async def test_flash_service_raises_when_no_coordinator_for_device(hass, mock_dlight_device, mock_config_entry):
+    """dlight.flash raises ServiceValidationError when the device has no loaded coordinator."""
+    from homeassistant.exceptions import ServiceValidationError
+    from homeassistant.helpers import device_registry as dr_module
+
+    await setup_integration(hass, mock_config_entry)
+
+    # Add a second device entry linked only to a "ghost" entry with no coordinator.
+    other_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"ip_address": "10.0.0.1", "device_id": "ghost_id"},
+        title="Ghost Lamp",
+        entry_id="ghost_entry_id",
+    )
+    other_entry.add_to_hass(hass)
+    dev_reg = dr_module.async_get(hass)
+    ghost_device = dev_reg.async_get_or_create(
+        config_entry_id=other_entry.entry_id,
+        identifiers={(DOMAIN, "ghost_id")},
+        name="Ghost Lamp",
+    )
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_FLASH,
+            {"device_id": ghost_device.id},
+            blocking=True,
+        )
+
+
 async def test_flash_service_removed_on_last_entry_unload(hass, mock_dlight_device, mock_config_entry):
     """dlight.flash service is removed when the last entry is unloaded."""
     await setup_integration(hass, mock_config_entry)

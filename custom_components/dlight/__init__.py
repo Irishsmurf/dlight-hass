@@ -86,8 +86,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
                 )
             for entry_id in device_entry.config_entries:
                 cfg = hass.config_entries.async_get_entry(entry_id)
-                if cfg and cfg.domain == DOMAIN and cfg.runtime_data is not None:
-                    coord: DLightCoordinator = cfg.runtime_data
+                if not cfg or cfg.domain != DOMAIN:
+                    continue
+                try:
+                    coord_or_none = cfg.runtime_data
+                except (AttributeError, RuntimeError):
+                    continue
+                if coord_or_none is not None:
+                    coord: DLightCoordinator = coord_or_none
                     device = coord.device
                     coord.identify_in_progress = True
                     try:

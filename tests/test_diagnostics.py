@@ -71,7 +71,7 @@ async def test_diagnostics_redacts_identifiers(hass):
 
 
 async def test_diagnostics_coordinator_health_on_failure(hass, mock_dlight_device, mock_config_entry):
-    """coordinator_health reflects consecutive failures and null last_success when never polled."""
+    """coordinator_health reflects consecutive failures; last_success retains the pre-failure timestamp."""
     from dlightclient import DLightConnectionError
     from .conftest import setup_integration
 

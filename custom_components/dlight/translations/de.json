@@ -94,6 +94,21 @@
         },
         "identify_failed": {
             "message": "Fehler beim Identifizieren von {device_name}. Das Gerät meldete: {error}"
+        },
+        "flash_unknown_device": {
+            "message": "Unbekannte Geräte-ID: {device_id}. Stellen Sie sicher, dass das Ziel eine konfigurierte dLight-Lampe ist."
+        }
+    },
+    "services": {
+        "flash": {
+            "name": "Blinken",
+            "description": "Lässt die Lampe kurz aufleuchten, um sie physisch im Raum zu identifizieren.",
+            "fields": {
+                "device_id": {
+                    "name": "Gerät",
+                    "description": "Die dLight-Lampe, die blinken soll."
+                }
+            }
         }
     }
 }

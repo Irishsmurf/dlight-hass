@@ -1,0 +1,11 @@
+flash:
+  name: Flash
+  description: Blinks the lamp briefly to identify it physically in a room.
+  fields:
+    device_id:
+      name: Device
+      description: The dLight lamp to flash.
+      required: true
+      selector:
+        device:
+          integration: dlight

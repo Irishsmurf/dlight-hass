@@ -94,6 +94,21 @@
         },
         "identify_failed": {
             "message": "Échec de l'identification de {device_name}. L'appareil a signalé : {error}"
+        },
+        "flash_unknown_device": {
+            "message": "Identifiant d'appareil inconnu : {device_id}. Assurez-vous que la cible est une lampe dLight configurée."
+        }
+    },
+    "services": {
+        "flash": {
+            "name": "Clignoter",
+            "description": "Fait clignoter brièvement la lampe pour l'identifier physiquement dans une pièce.",
+            "fields": {
+                "device_id": {
+                    "name": "Appareil",
+                    "description": "La lampe dLight à faire clignoter."
+                }
+            }
         }
     }
 }

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Clamp `color_temp_kelvin` to `[KELVIN_MIN, KELVIN_MAX]` in `async_turn_on` before issuing device commands; out-of-range values (e.g. 6500 K daylight preset) are silently bounded to the hardware range instead of triggering undefined device behaviour (closes #77).
+
 ## [2.4.0] - 2026-06-14
 
 ### Added

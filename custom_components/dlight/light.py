@@ -256,6 +256,8 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         """
         brightness: int | None = kwargs.get(ATTR_BRIGHTNESS)
         kelvin: int | None = kwargs.get(ATTR_COLOR_TEMP_KELVIN)
+        if kelvin is not None:
+            kelvin = max(KELVIN_MIN, min(KELVIN_MAX, kelvin))
         transition: float | None = kwargs.get(ATTR_TRANSITION)
 
         _LOGGER.debug(

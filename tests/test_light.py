@@ -717,6 +717,78 @@ async def test_turn_on_only_kelvin_does_not_use_apply_scene(
 
 
 # ---------------------------------------------------------------------------
+# Kelvin clamping tests (issue #77)
+# ---------------------------------------------------------------------------
+
+
+async def test_turn_on_kelvin_below_min_is_clamped(hass, mock_dlight_device, mock_config_entry):
+    """color_temp_kelvin below KELVIN_MIN is clamped to KELVIN_MIN before the device command."""
+    from custom_components.dlight.const import KELVIN_MIN
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "color_temp_kelvin": 1000},
+        blocking=True,
+    )
+
+    mock_dlight_device.set_color_temperature.assert_called_once_with(KELVIN_MIN)
+    state = hass.states.get("light.test_light")
+    assert state.attributes.get("color_temp_kelvin") == KELVIN_MIN
+
+
+async def test_turn_on_kelvin_above_max_is_clamped(hass, mock_dlight_device, mock_config_entry):
+    """color_temp_kelvin above KELVIN_MAX is clamped to KELVIN_MAX before the device command."""
+    from custom_components.dlight.const import KELVIN_MAX
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "color_temp_kelvin": 9000},
+        blocking=True,
+    )
+
+    mock_dlight_device.set_color_temperature.assert_called_once_with(KELVIN_MAX)
+    state = hass.states.get("light.test_light")
+    assert state.attributes.get("color_temp_kelvin") == KELVIN_MAX
+
+
+async def test_fade_kelvin_target_clamped_at_start(hass, mock_dlight_device, mock_config_entry):
+    """Out-of-range Kelvin is clamped before the fade plan is built; all steps stay in range."""
+    from custom_components.dlight.const import KELVIN_MAX
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.dlight.AsyncDLightClient", autospec=True):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "color_temp_kelvin": 8000, "transition": 1},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    kelvin_calls = [c.args[0] for c in mock_dlight_device.set_color_temperature.call_args_list]
+    assert kelvin_calls, "Fade sent no set_color_temperature calls"
+    assert all(k <= KELVIN_MAX for k in kelvin_calls), (
+        f"Fade exceeded KELVIN_MAX: {kelvin_calls}"
+    )
+    assert kelvin_calls[-1] == KELVIN_MAX
+
+    state = hass.states.get("light.test_light")
+    assert state.attributes.get("color_temp_kelvin") == KELVIN_MAX
+
+
+# ---------------------------------------------------------------------------
 # Physical button press / external control event tests (issue #18)
 # ---------------------------------------------------------------------------
 

@@ -55,6 +55,16 @@ class DLightUpdateEntity(CoordinatorEntity[DLightCoordinator], UpdateEntity):
         )
 
     @property
+    def available(self) -> bool:
+        """Return True when a cached firmware version exists.
+
+        coordinator.info is fetched once at setup and never changes, so
+        swVersion remains known even when the lamp is unreachable. Hiding a
+        known static fact because of a transient connectivity loss is unhelpful.
+        """
+        return bool(self.coordinator.info.get("swVersion"))
+
+    @property
     def installed_version(self) -> str | None:
         """Return the firmware version fetched during coordinator setup."""
         return self.coordinator.info.get("swVersion")

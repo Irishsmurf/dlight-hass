@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Override `available` on `DLightUpdateEntity` to return `True` whenever `coordinator.info` contains `swVersion`; the firmware version is static metadata fetched once at setup and should remain visible even while the lamp is unreachable (closes #76).
+
 ## [2.4.0] - 2026-06-14
 
 ### Added

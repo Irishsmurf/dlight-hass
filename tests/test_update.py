@@ -39,10 +39,10 @@ async def test_firmware_entity_latest_version_is_none(
     assert state.attributes.get("latest_version") is None
 
 
-async def test_firmware_entity_unavailable_on_coordinator_failure(
+async def test_firmware_entity_stays_available_on_coordinator_failure(
     hass, mock_dlight_device, mock_config_entry
 ):
-    """Firmware entity goes unavailable when the coordinator loses the lamp."""
+    """Firmware entity stays available and shows cached version when lamp is offline."""
     await setup_integration(hass, mock_config_entry)
     coordinator = mock_config_entry.runtime_data
 
@@ -56,12 +56,7 @@ async def test_firmware_entity_unavailable_on_coordinator_failure(
     await coordinator.async_refresh()
     await hass.async_block_till_done()
 
-    assert hass.states.get(entity_id).state == "unavailable"
-
-    # Recovery: entity becomes available again.
-    mock_dlight_device.get_state.side_effect = None
-    await coordinator.async_refresh()
-    await hass.async_block_till_done()
-
+    # Entity must remain available — firmware version is static cached metadata.
     assert hass.states.get(entity_id).state != "unavailable"
     assert hass.states.get(entity_id).attributes.get("installed_version") == "1.0.0"
+    assert hass.states.get(entity_id).attributes.get("latest_version") is None

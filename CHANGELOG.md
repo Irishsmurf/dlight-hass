@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add `OptionsFlowHandler` to `config_flow.py` with three poll-interval presets (15 s / 30 s / 60 s); `DLightCoordinator` reads `entry.options.get("poll_interval", POLL_INTERVAL)` on init so a saved change triggers an entry reload and the new interval takes effect immediately (closes #79).
+
 ### Changed
 - Add Codecov flags and component definitions for `sensor`, `event`, and `update` platforms in `.codecov.yml` and `tests.yaml`; per-component coverage is now tracked and enforced for all six platforms (closes #74).
 - Enrich diagnostics snapshot with a `coordinator_health` dict containing `consecutive_failures` (int), `last_success` (ISO timestamp or null), and `rediscovery_in_flight` (bool); no IP addresses are included in the new fields (closes #75).

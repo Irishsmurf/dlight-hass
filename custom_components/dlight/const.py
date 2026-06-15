@@ -6,8 +6,9 @@ DOMAIN = "dlight"
 EVENT_PHYSICAL_CONTROL = "dlight_physical_control"
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.EVENT, Platform.LIGHT, Platform.SENSOR, Platform.UPDATE]
 
-# Extra config-entry key (the IP address uses HA's standard CONF_IP_ADDRESS).
+# Extra config-entry keys (the IP address uses HA's standard CONF_IP_ADDRESS).
 CONF_DEVICE_ID = "device_id"
+CONF_POLL_INTERVAL = "poll_interval"
 
 # How often the coordinator polls each lamp, in seconds.
 POLL_INTERVAL = 30

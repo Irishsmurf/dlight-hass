@@ -1,12 +1,33 @@
 """Tests for DLightCoordinator's rediscovery fallback."""
+from datetime import timedelta
 from unittest.mock import patch
 
 from dlightclient import DLightConnectionError
 
-from homeassistant.const import CONF_IP_ADDRESS
+from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.dlight.const import REDISCOVERY_FAILURE_THRESHOLD
+from custom_components.dlight.const import CONF_POLL_INTERVAL, DOMAIN, CONF_DEVICE_ID, REDISCOVERY_FAILURE_THRESHOLD
 from .conftest import setup_integration
+
+
+async def test_coordinator_uses_options_poll_interval(hass, mock_dlight_device):
+    """Coordinator update_interval reflects entry options rather than the hardcoded default."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_IP_ADDRESS: "127.0.0.1", CONF_DEVICE_ID: "test_device_id", CONF_NAME: "Test Light"},
+        options={CONF_POLL_INTERVAL: 15},
+        title="Test Light",
+        entry_id="test_entry_poll",
+    )
+    await setup_integration(hass, entry)
+    assert entry.runtime_data.update_interval == timedelta(seconds=15)
+
+
+async def test_coordinator_defaults_to_30s_without_options(hass, mock_dlight_device, mock_config_entry):
+    """Coordinator falls back to 30-second default when no poll_interval option is set."""
+    await setup_integration(hass, mock_config_entry)
+    assert mock_config_entry.runtime_data.update_interval == timedelta(seconds=30)
 
 
 def make_stream(*devices):

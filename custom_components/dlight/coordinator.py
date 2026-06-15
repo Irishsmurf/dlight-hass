@@ -21,6 +21,7 @@ from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    CONF_POLL_INTERVAL,
     POLL_INTERVAL,
     POLL_TIMEOUT,
     REDISCOVERY_DURATION,
@@ -49,12 +50,13 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         name: str,
     ) -> None:
         """Initialize the coordinator for a single device."""
+        poll_seconds = entry.options.get(CONF_POLL_INTERVAL, POLL_INTERVAL)
         super().__init__(
             hass,
             _LOGGER,
             config_entry=entry,
             name=f"{name} state coordinator",
-            update_interval=timedelta(seconds=POLL_INTERVAL),
+            update_interval=timedelta(seconds=poll_seconds),
         )
         self.device = device
         # Static identity, filled once by _async_setup before the first poll.

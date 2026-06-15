@@ -53,6 +53,20 @@
             "unknown_device": "Ní mheaitseálann an gléas líonra seo aon lampa dLight atá cumraithe."
         }
     },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Eatramh iarrtais",
+                "description": "Roghnaigh cé chomh minic is a dhéanann an comhtháthú ceistiú ar staid gach lampa.",
+                "data": {
+                    "poll_interval": "Eatramh iarrtais (soicindí)"
+                },
+                "data_description": {
+                    "poll_interval": "15 s le haghaidh braiteacht cnaipe fisiciúil fhreagrach; 30 s mar réamhshocrú cothrom; 60 s do lampaí leanúnacha i seomraí ísealúsáide."
+                }
+            }
+        }
+    },
     "entity": {
         "sensor": {
             "brightness": {

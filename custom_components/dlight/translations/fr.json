@@ -53,6 +53,20 @@
             "unknown_device": "Cet appareil réseau ne correspond à aucune lampe dLight configurée."
         }
     },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Intervalle d'interrogation",
+                "description": "Choisissez la fréquence à laquelle l'intégration interroge l'état de chaque lampe.",
+                "data": {
+                    "poll_interval": "Intervalle d'interrogation (secondes)"
+                },
+                "data_description": {
+                    "poll_interval": "15 s pour une détection réactive des boutons physiques ; 30 s pour un équilibre par défaut ; 60 s pour des lampes toujours allumées dans des pièces peu fréquentées."
+                }
+            }
+        }
+    },
     "entity": {
         "sensor": {
             "brightness": {

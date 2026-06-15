@@ -30,7 +30,7 @@ from dlightclient import (
 
 from homeassistant import config_entries, exceptions
 from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import device_registry as dr
 
@@ -42,7 +42,9 @@ if TYPE_CHECKING:
 
 from .const import (
     CONF_DEVICE_ID,
+    CONF_POLL_INTERVAL,
     DOMAIN,
+    POLL_INTERVAL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -274,6 +276,14 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
         return self.async_abort(reason="unknown_device")
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> DLightOptionsFlowHandler:
+        """Return an options flow handler for this entry."""
+        return DLightOptionsFlowHandler()
+
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -306,6 +316,28 @@ class DLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 STEP_USER_DATA_SCHEMA, user_input or entry.data
             ),
             errors=errors,
+        )
+
+
+_POLL_INTERVAL_OPTIONS = [15, 30, 60]
+
+
+class DLightOptionsFlowHandler(config_entries.OptionsFlow):
+    """Options flow: choose the poll interval preset."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Show the poll interval selector."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        current = self.config_entry.options.get(CONF_POLL_INTERVAL, POLL_INTERVAL)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {vol.Required(CONF_POLL_INTERVAL, default=current): vol.In(_POLL_INTERVAL_OPTIONS)}
+            ),
         )
 
 

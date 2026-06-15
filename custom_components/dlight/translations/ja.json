@@ -108,6 +108,21 @@
         },
         "identify_failed": {
             "message": "{device_name} の識別に失敗しました。デバイスの報告: {error}"
+        },
+        "flash_unknown_device": {
+            "message": "不明なデバイスID: {device_id}。対象が設定済みのdLightランプであることを確認してください。"
+        }
+    },
+    "services": {
+        "flash": {
+            "name": "フラッシュ",
+            "description": "ランプを短く点滅させて、部屋の中で物理的に識別します。",
+            "fields": {
+                "device_id": {
+                    "name": "デバイス",
+                    "description": "点滅させるdLightランプ。"
+                }
+            }
         }
     }
 }

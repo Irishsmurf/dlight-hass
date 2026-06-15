@@ -108,6 +108,21 @@
         },
         "identify_failed": {
             "message": "Failed to identify {device_name}. Device reported: {error}"
+        },
+        "flash_unknown_device": {
+            "message": "Unknown device ID: {device_id}. Make sure the target is a configured dLight lamp."
+        }
+    },
+    "services": {
+        "flash": {
+            "name": "Flash",
+            "description": "Blinks the lamp briefly to identify it physically in a room.",
+            "fields": {
+                "device_id": {
+                    "name": "Device",
+                    "description": "The dLight lamp to flash."
+                }
+            }
         }
     }
 }

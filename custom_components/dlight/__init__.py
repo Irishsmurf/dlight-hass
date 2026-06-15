@@ -11,16 +11,19 @@ from dlightclient import AsyncDLightClient, DLightDevice
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_IP_ADDRESS
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryError
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import ConfigEntryError, HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import device_registry as dr
 
-from .const import CONF_DEVICE_ID, PLATFORMS
+from .const import CONF_DEVICE_ID, DOMAIN, PLATFORMS
 from .coordinator import DLightCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 # The typed alias every signature uses: runtime_data carries the coordinator.
 type DLightConfigEntry = ConfigEntry[DLightCoordinator]
+
+SERVICE_FLASH = "flash"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bool:
@@ -66,6 +69,85 @@ async def async_setup_entry(hass: HomeAssistant, entry: DLightConfigEntry) -> bo
     # Reload the entry whenever the user changes options (e.g. poll interval),
     # so the coordinator picks up the new update_interval on re-setup.
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+
+    # Register the dlight.flash service once; idempotent across multi-lamp setups.
+    if not hass.services.has_service(DOMAIN, SERVICE_FLASH):
+        async def _handle_flash(call: ServiceCall) -> None:
+            target_device_id: str | None = call.data.get("device_id")
+            if not target_device_id:
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="flash_unknown_device",
+                    translation_placeholders={"device_id": ""},
+                )
+            dev_reg = dr.async_get(hass)
+            device_entry = dev_reg.async_get(target_device_id)
+            if not device_entry:
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="flash_unknown_device",
+                    translation_placeholders={"device_id": target_device_id},
+                )
+            for entry_id in device_entry.config_entries:
+                cfg = hass.config_entries.async_get_entry(entry_id)
+                if not cfg or cfg.domain != DOMAIN:
+                    continue
+                try:
+                    coord_or_none = cfg.runtime_data
+                except (AttributeError, RuntimeError):
+                    continue
+                if coord_or_none is not None:
+                    coord: DLightCoordinator = coord_or_none
+                    device = coord.device
+                    coord.identify_in_progress = True
+                    try:
+                        async with coord.command_lock:
+                            success = await device.flash()
+                    except Exception as err:
+                        _LOGGER.exception("Flash service failed for dLight %s", device.id)
+                        raise HomeAssistantError(
+                            translation_domain=DOMAIN,
+                            translation_key="identify_failed",
+                            translation_placeholders={
+                                "device_name": cfg.title or f"dLight {device.id}",
+                                "error": str(err),
+                            },
+                        ) from err
+                    finally:
+                        coord.identify_in_progress = False
+                    if not success:
+                        raise HomeAssistantError(
+                            translation_domain=DOMAIN,
+                            translation_key="identify_failed",
+                            translation_placeholders={
+                                "device_name": cfg.title or f"dLight {device.id}",
+                                "error": "flash sequence did not complete",
+                            },
+                        )
+                    return
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="flash_unknown_device",
+                translation_placeholders={"device_id": target_device_id},
+            )
+
+        hass.services.async_register(DOMAIN, SERVICE_FLASH, _handle_flash)
+
+    def _maybe_remove_service() -> None:
+        remaining = []
+        for e in hass.config_entries.async_entries(DOMAIN):
+            if e.entry_id == entry.entry_id:
+                continue
+            try:
+                # Only count entries that completed setup successfully.
+                if e.runtime_data is not None:
+                    remaining.append(e)
+            except Exception:  # noqa: BLE001
+                pass
+        if not remaining and hass.services.has_service(DOMAIN, SERVICE_FLASH):
+            hass.services.async_remove(DOMAIN, SERVICE_FLASH)
+
+    entry.async_on_unload(_maybe_remove_service)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

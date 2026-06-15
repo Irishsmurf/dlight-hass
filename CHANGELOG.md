@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Add `OptionsFlowHandler` to `config_flow.py` with three poll-interval presets (15 s / 30 s / 60 s); `DLightCoordinator` reads `entry.options.get("poll_interval", POLL_INTERVAL)` on init so a saved change triggers an entry reload and the new interval takes effect immediately (closes #79).
+- Add `dlight.flash` service to `__init__.py`; accepts a `device_id` and calls `device.flash()` under `coordinator.command_lock` — enables automation-triggered lamp identification without targeting the button entity (closes #78).
 
 ### Changed
 - Add Codecov flags and component definitions for `sensor`, `event`, and `update` platforms in `.codecov.yml` and `tests.yaml`; per-component coverage is now tracked and enforced for all six platforms (closes #74).

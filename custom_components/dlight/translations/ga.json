@@ -108,6 +108,21 @@
         },
         "identify_failed": {
             "message": "Theip ar {device_name} a aithint. Thuairiscigh an gléas: {error}"
+        },
+        "flash_unknown_device": {
+            "message": "Aitheantas gléis anaithnid: {device_id}. Déan cinnte gurb é an sprioc lampa dLight cumraithe."
+        }
+    },
+    "services": {
+        "flash": {
+            "name": "Splancadh",
+            "description": "Caochnaíonn an lampa go gairid chun é a aithint go fisiciúil sa seomra.",
+            "fields": {
+                "device_id": {
+                    "name": "Gléas",
+                    "description": "An lampa dLight atá le caochadh."
+                }
+            }
         }
     }
 }

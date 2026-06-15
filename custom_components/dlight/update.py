@@ -4,8 +4,9 @@ The coordinator fetches swVersion once during setup and caches it in
 coordinator.info. The entity surfaces that as `installed_version`; no OTA
 source is currently known so `latest_version` is always None.
 
-The entity inherits CoordinatorEntity so it goes unavailable when the lamp
-drops off the network (coordinator.last_update_success is False).
+The entity overrides `available` to stay True whenever swVersion is cached,
+even when the lamp is temporarily unreachable. Firmware version is static
+metadata — hiding a known fact due to transient connectivity loss is unhelpful.
 """
 from __future__ import annotations
 

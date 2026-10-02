@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Support the standard `flash: short | long` option of `light.turn_on` (`LightEntityFeature.FLASH`): runs `device.flash()` with 2 or 5 blinks under `command_lock`, with `identify_in_progress` set so a mid-flash poll isn't reported as a physical change; the lamp returns to its previous state. A failure raises the new translated `flash_failed` error (closes #92).
+
 ### Fixed
 - Snap `color_temp_kelvin` to the lamp's 100 K grid (round half up, then clamp) in `async_turn_on` and in every emulated-fade step. The lamp floors off-grid values on its own (5250 → 5200), so the next poll never matched the optimistic state: the UI snapped back after the hold window and a spurious `dlight_physical_control` `changed` event fired, which broke circadian/sun-following automations (closes #88).
 - Restart the optimistic hold window when an emulated fade completes, not only when it starts. A fade longer than the poll interval used to end outside the window, so its closing reconcile compared against the pre-fade state and fired a spurious `dlight_physical_control` `changed` event for the whole fade (closes #89).

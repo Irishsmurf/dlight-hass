@@ -35,7 +35,10 @@ from dlightclient import DLightDevice
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_COLOR_TEMP_KELVIN,
+    ATTR_FLASH,
     ATTR_TRANSITION,
+    FLASH_LONG,
+    FLASH_SHORT,
     ColorMode,
     LightEntity,
     LightEntityFeature,
@@ -63,6 +66,10 @@ PARALLEL_UPDATES = 1
 # into command floods (the interval stretches instead).
 TRANSITION_STEP_INTERVAL = 0.5
 TRANSITION_MAX_STEPS = 60
+
+# Blink counts for the standard `flash:` turn_on option. device.flash() saves
+# the lamp's state, blinks, and restores it, so an off lamp ends up off again.
+FLASH_PATTERNS = {FLASH_SHORT: 2, FLASH_LONG: 5}
 
 
 def _to_ha_brightness(percent: int) -> int:
@@ -166,7 +173,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
     _attr_color_mode = ColorMode.COLOR_TEMP
     _attr_min_color_temp_kelvin = KELVIN_MIN
     _attr_max_color_temp_kelvin = KELVIN_MAX
-    _attr_supported_features = LightEntityFeature.TRANSITION
+    _attr_supported_features = LightEntityFeature.TRANSITION | LightEntityFeature.FLASH
 
     def __init__(
         self,
@@ -267,6 +274,12 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         With `transition:` the change is emulated by a background fade task
         instead; the service call returns once the fade is scheduled.
         """
+        if (flash := kwargs.get(ATTR_FLASH)) is not None:
+            # A flash is an alert, not a state change: other attributes in the
+            # same call are ignored and the lamp returns to its prior state.
+            await self._async_flash(flash)
+            return
+
         brightness: int | None = kwargs.get(ATTR_BRIGHTNESS)
         kelvin: int | None = kwargs.get(ATTR_COLOR_TEMP_KELVIN)
         if kelvin is not None:
@@ -442,6 +455,44 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                     "error": str(err),
                 },
             ) from err
+
+    async def _async_flash(self, flash: str) -> None:
+        """Blink the lamp for `flash: short|long`, then restore its state.
+
+        Runs like the Identify button: the command lock spans the whole
+        sequence (a command landing mid-flash would corrupt the state flash()
+        restores), and identify_in_progress keeps a mid-flash poll from being
+        reported as a physical change.
+        """
+        _LOGGER.debug("%s: flash=%s", self.entity_id, flash)
+        await self._async_cancel_transition()
+        flashes = FLASH_PATTERNS.get(flash, FLASH_PATTERNS[FLASH_SHORT])
+        self.coordinator.identify_in_progress = True
+        try:
+            async with self.coordinator.command_lock:
+                success = await self.device.flash(flashes=flashes)
+        except Exception as err:
+            _LOGGER.exception("Flash failed for dLight %s", self.device.id)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="flash_failed",
+                translation_placeholders={
+                    "device_name": self._base_name,
+                    "error": str(err),
+                },
+            ) from err
+        finally:
+            self.coordinator.identify_in_progress = False
+        if not success:
+            # flash() swallows device errors and reports via its bool result.
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="flash_failed",
+                translation_placeholders={
+                    "device_name": self._base_name,
+                    "error": "flash sequence did not complete",
+                },
+            )
 
     async def _send(self, commands: list) -> None:
         """Run device commands concurrently; raise the first failure, if any.

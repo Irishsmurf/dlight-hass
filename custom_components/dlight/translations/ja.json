@@ -109,6 +109,9 @@
         "identify_failed": {
             "message": "{device_name} の識別に失敗しました。デバイスの報告: {error}"
         },
+        "flash_failed": {
+            "message": "{device_name} の点滅に失敗しました。デバイスの報告: {error}"
+        },
         "flash_unknown_device": {
             "message": "不明なデバイスID: {device_id}。対象が設定済みのdLightランプであることを確認してください。"
         }

@@ -109,6 +109,9 @@
         "identify_failed": {
             "message": "Fehler beim Identifizieren von {device_name}. Das Gerät meldete: {error}"
         },
+        "flash_failed": {
+            "message": "Fehler beim Blinken von {device_name}. Das Gerät meldete: {error}"
+        },
         "flash_unknown_device": {
             "message": "Unbekannte Geräte-ID: {device_id}. Stellen Sie sicher, dass das Ziel eine konfigurierte dLight-Lampe ist."
         }

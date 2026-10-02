@@ -48,7 +48,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, FADE_TO_OFF_TARGET_PCT, KELVIN_MAX, KELVIN_MIN, KELVIN_STEP, MIN_BRIGHTNESS_PCT, POLL_INTERVAL
+from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, FADE_TO_OFF_TARGET_PCT, KELVIN_MAX, KELVIN_MIN, KELVIN_STEP, MIN_BRIGHTNESS_PCT
 from .coordinator import DLightCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -717,7 +717,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
         within_hold = (
             self._optimistic_on is not None
-            and time.monotonic() - self._last_command_time < POLL_INTERVAL
+            and time.monotonic() - self._last_command_time < self.coordinator.poll_interval
         )
 
         if within_hold:

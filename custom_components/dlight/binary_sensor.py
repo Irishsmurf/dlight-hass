@@ -19,7 +19,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, POLL_INTERVAL
+from .const import DOMAIN
 from .coordinator import DLightCoordinator
 
 # Read-only view over coordinator data; nothing to serialize.
@@ -80,5 +80,5 @@ class DLightConnectivitySensor(CoordinatorEntity[DLightCoordinator], BinarySenso
             "consecutive_failures": coord.consecutive_failures,
             "last_successful_poll": coord.last_successful_poll,
             "rediscovery_in_progress": coord.rediscovery_in_progress,
-            "poll_interval_seconds": POLL_INTERVAL,
+            "poll_interval_seconds": coord.poll_interval,
         }

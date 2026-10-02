@@ -45,7 +45,7 @@ Key points:
 
 | Constant | Value | Meaning |
 |---|---|---|
-| `POLL_INTERVAL` | `30` s | How often each lamp is polled. |
+| `POLL_INTERVAL` | `30` s | Default poll interval; the options flow can override it per lamp (15/30/60 s). Read the effective value from `coordinator.poll_interval`, which the light's hold window and the connectivity sensor both use. |
 | `POLL_TIMEOUT` | `10` s | Hard ceiling for a single poll. |
 | `REDISCOVERY_FAILURE_THRESHOLD` | `3` | Consecutive failures between rediscovery sweeps. |
 | `REDISCOVERY_DURATION` | `2.0` s | How long a sweep listens for UDP answers. |

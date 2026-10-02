@@ -1042,6 +1042,39 @@ async def test_physical_control_not_fired_within_hold_window(
         assert events == []
 
 
+async def test_hold_window_follows_configured_poll_interval(hass, mock_dlight_device):
+    """With a 60 s poll interval, a stale poll 45 s after a command is still held off (#90)."""
+    from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from custom_components.dlight.const import CONF_DEVICE_ID, CONF_POLL_INTERVAL
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_IP_ADDRESS: "127.0.0.1", CONF_DEVICE_ID: "test_device_id", CONF_NAME: "Test Light"},
+        options={CONF_POLL_INTERVAL: 60},
+        title="Test Light",
+        entry_id="test_entry_poll",
+    )
+    _lamp_returns_fresh_state(mock_dlight_device)
+    fake_time = [1000.0]
+    with patch("custom_components.dlight.light.time") as mock_time:
+        mock_time.monotonic = lambda: fake_time[0]
+        await setup_integration(hass, entry)
+        coordinator = entry.runtime_data
+
+        # The lamp hasn't processed the turn_off yet: polls still say "on".
+        mock_dlight_device.turn_off.side_effect = None
+        await hass.services.async_call(
+            LIGHT_DOMAIN, "turn_off", {"entity_id": "light.test_light"}, blocking=True
+        )
+        fake_time[0] += 45
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    # Stale poll ignored: the UI keeps the commanded state instead of snapping back.
+    assert hass.states.get("light.test_light").state == "off"
+
+
 async def test_physical_control_not_fired_when_state_unchanged(
     hass, mock_dlight_device, mock_config_entry
 ):

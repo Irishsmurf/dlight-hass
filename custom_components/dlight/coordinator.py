@@ -76,6 +76,11 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.identify_in_progress: bool = False
 
     @property
+    def poll_interval(self) -> int:
+        """Return the configured poll interval in seconds (entry option or default)."""
+        return int(self.update_interval.total_seconds())
+
+    @property
     def consecutive_failures(self) -> int:
         """Return the number of consecutive failed polls."""
         return self._consecutive_failures

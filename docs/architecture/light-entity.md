@@ -15,7 +15,7 @@ _attr_supported_features = LightEntityFeature.TRANSITION
 PARALLEL_UPDATES = 1           # serialize service calls per lamp
 ```
 
-The device-registry card (manufacturer, model, firmware, MAC, configuration URL) is built **once** from `coordinator.info`, which is static.
+The device-registry card (manufacturer, model, firmware, MAC, configuration URL) is built **once** from `coordinator.info`, which is static. If the info wasn't available at setup, the coordinator fills the card in later by updating the device registry entry directly.
 
 ## Brightness scaling
 

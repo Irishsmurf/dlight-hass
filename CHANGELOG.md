@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restart the optimistic hold window when an emulated fade completes, not only when it starts. A fade longer than the poll interval used to end outside the window, so its closing reconcile compared against the pre-fade state and fired a spurious `dlight_physical_control` `changed` event for the whole fade (closes #89).
 - Use the configured poll interval (`coordinator.poll_interval`) for the light's optimistic hold window and the connectivity sensor's `poll_interval_seconds` attribute; both still used the 30 s `POLL_INTERVAL` default after the options flow (#79) made the interval configurable, so with a 60 s interval a stale poll could snap the UI back (closes #90).
 - Report the installed firmware as `latest_version` on the update entity until an OTA source exists; with `latest_version = None` Home Assistant showed the entity as `unknown` forever instead of *up to date* (closes #91).
+- Retry the static device-info query after a successful poll (at most every `INFO_RETRY_INTERVAL`, 300 s) when it failed at setup, and update the device registry entry in place; a lamp offline at Home Assistant start used to keep a generic card (no model, firmware or MAC) and an unavailable firmware entity until the entry was reloaded. The manufacturer is now plain `dLight` instead of `dLight (via custom integration)` (closes #93).
 
 ## [2.5.0] - 2026-06-15
 

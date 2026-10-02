@@ -13,6 +13,12 @@ CONF_POLL_INTERVAL = "poll_interval"
 # How often the coordinator polls each lamp, in seconds.
 POLL_INTERVAL = 30
 
+# How long to wait between retries of the static device-info query when it
+# failed at setup (lamp offline at HA start). Retried only after a successful
+# state poll, so a lamp that never answers get_info costs one extra query per
+# interval, not one per poll.
+INFO_RETRY_INTERVAL = 300
+
 # Hard ceiling for a single poll (state + info queries combined), in seconds.
 POLL_TIMEOUT = 10
 

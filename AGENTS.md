@@ -14,7 +14,7 @@
 | Module (`custom_components/dlight/`) | Responsibility |
 |---|---|
 | `__init__.py` | Composition root: builds `DLightDevice` with a **persistent** `AsyncDLightClient`. Registers `client.close` on entry unload. Primes the first refresh and publishes the coordinator via `entry.runtime_data`. |
-| `coordinator.py` | `DLightCoordinator`: fetches static device info **once**; polls `get_state(force_update=True)` on interval. Failure ⇒ entity unavailable. After repeated consecutive failures, fires a one-shot UDP rediscovery sweep and self-heals the entry's IP if the lamp answers from a new address. Owns `command_lock`. |
+| `coordinator.py` | `DLightCoordinator`: fetches static device info **once** (retried after a successful poll, at most every `INFO_RETRY_INTERVAL`, if setup's fetch failed, updating the device registry in place); polls `get_state(force_update=True)` on interval. Failure ⇒ entity unavailable. After repeated consecutive failures, fires a one-shot UDP rediscovery sweep and self-heals the entry's IP if the lamp answers from a new address. Owns `command_lock`. |
 | `light.py` | `DLightEntity`: optimistic state view. Service calls (`turn_on`/`turn_off`) raise `HomeAssistantError` on failure for UI feedback. `transition:` is **emulated** by a cancellable background fade task (no native fade in the protocol). `PARALLEL_UPDATES = 1` serializes service calls; cross-platform command serialization uses `coordinator.command_lock`. |
 | `button.py` | Identify button (`ButtonDeviceClass.IDENTIFY`, diagnostic category) — runs `device.flash()` under `coordinator.command_lock`. |
 | `binary_sensor.py` | Connectivity diagnostic sensor mirroring `coordinator.last_update_success` (always `available`, so it reports *offline* instead of going unavailable). |

@@ -209,7 +209,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         device_info = DeviceInfo(
             identifiers={(DOMAIN, device.id)},
             name=self._base_name,
-            manufacturer="dLight (via custom integration)",
+            manufacturer="dLight",
             model=coordinator.info.get("deviceModel", "dLight"),
             sw_version=coordinator.info.get("swVersion"),
             hw_version=coordinator.info.get("hwVersion"),

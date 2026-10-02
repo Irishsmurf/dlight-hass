@@ -4,7 +4,7 @@
 
 ## Responsibilities
 
-- Fetch the lamp's **static info once**, before the first poll.
+- Fetch the lamp's **static info once**, before the first poll (retried later if that fails).
 - **Poll device state** on a fixed interval.
 - Own the **`command_lock`** that serializes commands across platforms.
 - Drive **runtime IP rediscovery** when a lamp goes unreachable.
@@ -13,10 +13,10 @@
 
 | Payload | Method | Cadence | Used for |
 |---|---|---|---|
-| Static info | `get_info()` | **Once**, in `_async_setup` | Device-registry card: model, firmware, hardware, MAC. |
+| Static info | `get_info()` | **Once**, in `_async_setup`; if that fails, retried after a successful poll at most every `INFO_RETRY_INTERVAL` (300 s) | Device-registry card: model, firmware, hardware, MAC. |
 | Dynamic state | `get_state(force_update=True)` | Every `POLL_INTERVAL` | The light's on/brightness/color. |
 
-`_async_setup` tolerates failure: the info payload is cosmetic, so a lamp that can't answer `get_info` still controls fine — it just shows a generic registry card.
+`_async_setup` tolerates failure: the info payload is cosmetic, so a lamp that can't answer `get_info` still controls fine — it just shows a generic registry card until a later retry succeeds. `_async_retry_info` then updates the device registry entry in place (model, firmware, hardware version, MAC connection), and the firmware update entity becomes available. Retry failures are logged at debug level only.
 
 ## The poll
 

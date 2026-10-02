@@ -18,10 +18,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_IP_ADDRESS
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.util import dt as dt_util
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
     CONF_POLL_INTERVAL,
+    DOMAIN,
+    INFO_RETRY_INTERVAL,
     POLL_INTERVAL,
     POLL_TIMEOUT,
     REDISCOVERY_DURATION,
@@ -37,7 +40,9 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     Two payloads, two cadences:
       * get_info  -> model / firmware / hardware versions. These never change
         between polls, so they are fetched ONCE (in _async_setup) and cached
-        in `self.info` for the device registry card.
+        in `self.info` for the device registry card. If that first fetch
+        fails, it is retried after a later successful poll (at most every
+        INFO_RETRY_INTERVAL) and the device registry is updated in place.
       * get_state -> {"on": bool, "brightness": 0-100, "color": {"temperature": K}}.
         This is the actual poll target, every poll_interval seconds.
     """
@@ -61,6 +66,8 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.device = device
         # Static identity, filled once by _async_setup before the first poll.
         self.info: dict[str, Any] = {}
+        # Earliest time to retry get_info while self.info is still empty.
+        self._info_retry_after: datetime | None = None
         # Serializes device *commands* across platforms (light commands,
         # transition fade steps, the identify button's flash sequence): the
         # lamp speaks over a single TCP socket, and PARALLEL_UPDATES only
@@ -120,8 +127,10 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         Failure is tolerated: the info payload is cosmetic (device registry
         card), and a lamp that can't answer get_info may still control fine.
+        A failed fetch is retried later from _async_update_data.
         """
         _LOGGER.debug("dLight %s: fetching static device info", self.device.id)
+        self._info_retry_after = dt_util.utcnow() + timedelta(seconds=INFO_RETRY_INTERVAL)
         try:
             ping_ok = await self.device.ping(timeout=2.0)
         except Exception:  # noqa: BLE001 — defensively catch any errors in ping
@@ -134,16 +143,25 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             return
 
+        await self._async_fetch_info()
+
+    async def _async_fetch_info(self, *, retry: bool = False) -> bool:
+        """Query get_info and cache the device-registry fields; True on success.
+
+        Setup failures are warnings (once); retry failures are debug-only so a
+        lamp that never answers get_info doesn't fill the log.
+        """
+        log = _LOGGER.debug if retry else _LOGGER.warning
         try:
             async with asyncio.timeout(POLL_TIMEOUT):
                 info = await self.device.get_info()
         except (TimeoutError, DLightError) as err:
-            _LOGGER.warning(
+            log(
                 "Could not read device info for %s (will show generic card): %s",
                 self.device.id,
                 err,
             )
-            return
+            return False
 
         if isinstance(info, dict) and info.get("status") == STATUS_SUCCESS:
             # Only the fields the device registry cares about.
@@ -157,12 +175,41 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.info.get("deviceModel"),
                 self.info.get("swVersion"),
             )
-        else:
-            _LOGGER.warning(
-                "Device info query for %s returned no usable data: %s",
-                self.device.id,
-                info,
-            )
+            return True
+        log(
+            "Device info query for %s returned no usable data: %s",
+            self.device.id,
+            info,
+        )
+        return False
+
+    async def _async_retry_info(self) -> None:
+        """Retry a get_info that failed at setup, then fill in the device card.
+
+        The light entity builds its DeviceInfo once, so a late success has to
+        update the device registry entry directly. Listeners are notified by
+        the poll that called us, which makes the firmware entity available.
+        """
+        now = dt_util.utcnow()
+        if self._info_retry_after is not None and now < self._info_retry_after:
+            return
+        self._info_retry_after = now + timedelta(seconds=INFO_RETRY_INTERVAL)
+        if not await self._async_fetch_info(retry=True):
+            return
+
+        dev_reg = dr.async_get(self.hass)
+        device_entry = dev_reg.async_get_device(identifiers={(DOMAIN, self.device.id)})
+        if device_entry is None:
+            return
+        update: dict[str, Any] = {
+            "model": self.info.get("deviceModel") or device_entry.model,
+            "sw_version": self.info.get("swVersion"),
+            "hw_version": self.info.get("hwVersion"),
+        }
+        if mac := self.info.get("macAddress"):
+            update["merge_connections"] = {(dr.CONNECTION_NETWORK_MAC, mac)}
+        dev_reg.async_update_device(device_entry.id, **update)
+        _LOGGER.info("dLight %s: device info fetched after setup; device card updated", self.device.id)
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Poll the lamp's current state; any failure marks it unavailable."""
@@ -193,6 +240,8 @@ class DLightCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
         self._consecutive_failures = 0
         self._last_successful_poll = dt_util.utcnow()
+        if not self.info:
+            await self._async_retry_info()
         _LOGGER.debug("dLight %s: poll success on=%s brightness=%s", self.device.id, state.get("on"), state.get("brightness"))
         return state
 

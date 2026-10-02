@@ -1,11 +1,15 @@
 import asyncio
+import copy
 import math
 
 import pytest
 from unittest.mock import patch, AsyncMock
+
+from dlightclient import DLightConnectionError
 from homeassistant.components.light import DOMAIN as LIGHT_DOMAIN
 
 from custom_components.dlight.const import DOMAIN, EVENT_PHYSICAL_CONTROL
+from .conftest import setup_integration
 
 
 async def test_light_setup(hass, mock_dlight_device, mock_config_entry):
@@ -789,6 +793,91 @@ async def test_fade_kelvin_target_clamped_at_start(hass, mock_dlight_device, moc
 
 
 # ---------------------------------------------------------------------------
+# Kelvin step grid tests (issue #88)
+# ---------------------------------------------------------------------------
+
+
+def _lamp_returns_fresh_state(mock_device):
+    """Make polls return a new dict each time, like the real client.
+
+    The shared fixture hands back the very dict its command mocks mutate, so a
+    snapshot of "the last confirmed state" silently changes along with the
+    lamp and no external change can ever be detected.
+    """
+    mock_device.get_state.side_effect = lambda *a, **k: copy.deepcopy(mock_device._current_state)
+
+
+def _lamp_floors_kelvin(mock_device):
+    """Make the mock behave like real hardware: Kelvin is stored in 100 K steps, floored."""
+    _lamp_returns_fresh_state(mock_device)
+
+    def set_color_temp(k):
+        mock_device._current_state.setdefault("color", {})["temperature"] = k // 100 * 100
+    mock_device.set_color_temperature.side_effect = set_color_temp
+
+
+async def test_turn_on_kelvin_snapped_to_nearest_step(hass, mock_dlight_device, mock_config_entry):
+    """Off-grid Kelvin is rounded to the nearest 100 K (half up) before it is sent."""
+    await setup_integration(hass, mock_config_entry)
+
+    for requested, sent in ((5250, 5300), (5240, 5200), (2649, 2600)):
+        mock_dlight_device.set_color_temperature.reset_mock()
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "color_temp_kelvin": requested},
+            blocking=True,
+        )
+        mock_dlight_device.set_color_temperature.assert_called_once_with(sent)
+        assert hass.states.get("light.test_light").attributes["color_temp_kelvin"] == sent
+
+
+async def test_off_grid_kelvin_does_not_fire_physical_control(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """The lamp's own rounding must not read as an external change after the hold window."""
+    _lamp_floors_kelvin(mock_dlight_device)
+    fake_time = [1000.0]
+    with patch("custom_components.dlight.light.time") as mock_time:
+        mock_time.monotonic = lambda: fake_time[0]
+        await setup_integration(hass, mock_config_entry)
+        coordinator = mock_config_entry.runtime_data
+        events = []
+        hass.bus.async_listen(EVENT_PHYSICAL_CONTROL, lambda e: events.append(e))
+
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "color_temp_kelvin": 5250},
+            blocking=True,
+        )
+        await coordinator.async_refresh()  # inside the hold window
+        fake_time[0] += 120
+        await coordinator.async_refresh()  # well outside it
+        await hass.async_block_till_done()
+
+    assert events == []
+    assert hass.states.get("light.test_light").attributes["color_temp_kelvin"] == 5300
+
+
+async def test_fade_kelvin_steps_on_grid(hass, mock_dlight_device, mock_config_entry):
+    """Every Kelvin value a fade sends is on the lamp's 100 K grid, ending on the snapped target."""
+    await setup_integration(hass, mock_config_entry)
+
+    # 4000 K -> 4350 K (snapped to 4400) over 2 s = 4 steps.
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "color_temp_kelvin": 4350, "transition": 2},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    kelvin_calls = [c.args[0] for c in mock_dlight_device.set_color_temperature.call_args_list]
+    assert kelvin_calls == [4100, 4200, 4300, 4400]
+
+
+# ---------------------------------------------------------------------------
 # Physical button press / external control event tests (issue #18)
 # ---------------------------------------------------------------------------
 
@@ -955,6 +1044,39 @@ async def test_physical_control_not_fired_within_hold_window(
         assert events == []
 
 
+async def test_hold_window_follows_configured_poll_interval(hass, mock_dlight_device):
+    """With a 60 s poll interval, a stale poll 45 s after a command is still held off (#90)."""
+    from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from custom_components.dlight.const import CONF_DEVICE_ID, CONF_POLL_INTERVAL
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_IP_ADDRESS: "127.0.0.1", CONF_DEVICE_ID: "test_device_id", CONF_NAME: "Test Light"},
+        options={CONF_POLL_INTERVAL: 60},
+        title="Test Light",
+        entry_id="test_entry_poll",
+    )
+    _lamp_returns_fresh_state(mock_dlight_device)
+    fake_time = [1000.0]
+    with patch("custom_components.dlight.light.time") as mock_time:
+        mock_time.monotonic = lambda: fake_time[0]
+        await setup_integration(hass, entry)
+        coordinator = entry.runtime_data
+
+        # The lamp hasn't processed the turn_off yet: polls still say "on".
+        mock_dlight_device.turn_off.side_effect = None
+        await hass.services.async_call(
+            LIGHT_DOMAIN, "turn_off", {"entity_id": "light.test_light"}, blocking=True
+        )
+        fake_time[0] += 45
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    # Stale poll ignored: the UI keeps the commanded state instead of snapping back.
+    assert hass.states.get("light.test_light").state == "off"
+
+
 async def test_physical_control_not_fired_when_state_unchanged(
     hass, mock_dlight_device, mock_config_entry
 ):
@@ -1025,6 +1147,47 @@ async def test_physical_control_not_fired_during_transition(
 
     # Cleanup: cancel the fade so the test doesn't block for 20 real seconds.
     await entity._async_cancel_transition()
+
+
+async def test_fade_longer_than_poll_interval_does_not_fire_physical_control(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """A fade that outlasts the hold window must not be reported as an external change (#89)."""
+    import time as real_time
+
+    _lamp_returns_fresh_state(mock_dlight_device)
+    start = real_time.monotonic()
+    with patch("custom_components.dlight.light.time") as mock_time:
+        # 100x clock: the 1 s fade below looks like ~100 s to the entity,
+        # far longer than the 30 s poll interval.
+        mock_time.monotonic = lambda: 1000 + (real_time.monotonic() - start) * 100
+        await setup_integration(hass, mock_config_entry)
+        coordinator = mock_config_entry.runtime_data
+        events = []
+        hass.bus.async_listen(EVENT_PHYSICAL_CONTROL, lambda e: events.append(e))
+
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "color_temp_kelvin": 3000, "transition": 1},
+            blocking=True,
+        )
+        await hass.async_block_till_done()  # fade runs to completion
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert events == []
+        assert hass.states.get("light.test_light").attributes["color_temp_kelvin"] == 3000
+
+        # A real external change after the fade is still reported, against the
+        # post-fade state rather than the pre-fade one.
+        await asyncio.sleep(0.5)  # ~50 s on the entity's clock: outside the hold window
+        mock_dlight_device._current_state["color"]["temperature"] = 4500
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    assert len(events) == 1
+    assert events[0].data["action"] == "changed"
+    assert events[0].data["previous_state"]["color"]["temperature"] == 3000
 
 
 async def test_failed_fade_does_not_fire_physical_control(
@@ -1258,3 +1421,112 @@ async def test_send_logs_all_exceptions_in_batch(
     assert any("additional command failure" in c for c in warning_calls), (
         f"Second exception was not logged. warning calls: {warning_calls}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Standard flash: option (issue #92)
+# ---------------------------------------------------------------------------
+
+
+async def test_light_supports_flash(hass, mock_dlight_device, mock_config_entry):
+    """The entity advertises LightEntityFeature.FLASH alongside TRANSITION."""
+    from homeassistant.components.light import LightEntityFeature
+
+    await setup_integration(hass, mock_config_entry)
+    features = hass.states.get("light.test_light").attributes["supported_features"]
+    assert features & LightEntityFeature.FLASH
+    assert features & LightEntityFeature.TRANSITION
+
+
+@pytest.mark.parametrize(("flash", "flashes"), [("short", 2), ("long", 5)])
+async def test_turn_on_flash_runs_flash_sequence(
+    hass, mock_dlight_device, mock_config_entry, flash, flashes
+):
+    """flash: short/long blinks the lamp and sends no state-changing commands."""
+    await setup_integration(hass, mock_config_entry)
+    coordinator = mock_config_entry.runtime_data
+    seen_flag = []
+
+    async def flash_side_effect(**kwargs):
+        seen_flag.append(coordinator.identify_in_progress)
+        return True
+
+    mock_dlight_device.flash.side_effect = flash_side_effect
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "flash": flash, "brightness": 10},
+        blocking=True,
+    )
+
+    mock_dlight_device.flash.assert_awaited_once_with(flashes=flashes)
+    assert seen_flag == [True]  # mid-flash polls are suppressed...
+    assert coordinator.identify_in_progress is False  # ...and only while flashing
+    mock_dlight_device.set_brightness.assert_not_called()
+    mock_dlight_device.turn_on.assert_not_called()
+
+
+async def test_turn_on_flash_does_not_fire_physical_control(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """A poll landing mid-flash is not reported as a physical change."""
+    await setup_integration(hass, mock_config_entry)
+    coordinator = mock_config_entry.runtime_data
+    events = []
+    hass.bus.async_listen(EVENT_PHYSICAL_CONTROL, lambda e: events.append(e))
+
+    async def flash_side_effect(**kwargs):
+        mock_dlight_device.get_state.return_value = {"on": False, "brightness": 50, "color": {"temperature": 4000}}
+        await coordinator.async_refresh()  # poll sees the lamp mid-blink
+        mock_dlight_device.get_state.return_value = {"on": True, "brightness": 50, "color": {"temperature": 4000}}
+        return True
+
+    mock_dlight_device.flash.side_effect = flash_side_effect
+    await hass.services.async_call(
+        LIGHT_DOMAIN, "turn_on", {"entity_id": "light.test_light", "flash": "short"}, blocking=True
+    )
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert events == []
+
+
+@pytest.mark.parametrize(
+    "side_effect", [DLightConnectionError("gone"), False], ids=["raises", "incomplete"]
+)
+async def test_turn_on_flash_failure_raises(
+    hass, mock_dlight_device, mock_config_entry, side_effect
+):
+    """A failed or incomplete flash raises HomeAssistantError and clears the flag."""
+    from homeassistant.exceptions import HomeAssistantError
+
+    await setup_integration(hass, mock_config_entry)
+    if isinstance(side_effect, Exception):
+        mock_dlight_device.flash.side_effect = side_effect
+    else:
+        mock_dlight_device.flash.return_value = side_effect
+    with pytest.raises(HomeAssistantError) as err:
+        await hass.services.async_call(
+            LIGHT_DOMAIN, "turn_on", {"entity_id": "light.test_light", "flash": "long"}, blocking=True
+        )
+    assert err.value.translation_key == "flash_failed"
+    assert mock_config_entry.runtime_data.identify_in_progress is False
+
+
+async def test_turn_on_flash_cancels_running_fade(hass, mock_dlight_device, mock_config_entry):
+    """A flash takes over from an in-flight fade, like any newer command."""
+    await setup_integration(hass, mock_config_entry)
+    entity = hass.data["light"].get_entity("light.test_light")
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "brightness": 255, "transition": 20},
+        blocking=True,
+    )
+    fade = entity._transition_task
+    assert fade is not None and not fade.done()
+
+    await hass.services.async_call(
+        LIGHT_DOMAIN, "turn_on", {"entity_id": "light.test_light", "flash": "short"}, blocking=True
+    )
+    assert fade.cancelled()
+    mock_dlight_device.flash.assert_awaited_once()

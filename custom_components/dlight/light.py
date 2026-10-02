@@ -35,7 +35,10 @@ from dlightclient import DLightDevice
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_COLOR_TEMP_KELVIN,
+    ATTR_FLASH,
     ATTR_TRANSITION,
+    FLASH_LONG,
+    FLASH_SHORT,
     ColorMode,
     LightEntity,
     LightEntityFeature,
@@ -48,7 +51,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, FADE_TO_OFF_TARGET_PCT, KELVIN_MAX, KELVIN_MIN, MIN_BRIGHTNESS_PCT, POLL_INTERVAL
+from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, FADE_TO_OFF_TARGET_PCT, KELVIN_MAX, KELVIN_MIN, KELVIN_STEP, MIN_BRIGHTNESS_PCT
 from .coordinator import DLightCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,6 +66,10 @@ PARALLEL_UPDATES = 1
 # into command floods (the interval stretches instead).
 TRANSITION_STEP_INTERVAL = 0.5
 TRANSITION_MAX_STEPS = 60
+
+# Blink counts for the standard `flash:` turn_on option. device.flash() saves
+# the lamp's state, blinks, and restores it, so an off lamp ends up off again.
+FLASH_PATTERNS = {FLASH_SHORT: 2, FLASH_LONG: 5}
 
 
 def _to_ha_brightness(percent: int) -> int:
@@ -88,6 +95,17 @@ def _to_dlight_brightness(brightness: int) -> int:
     return max(0, min(100, math.ceil(brightness / 255 * 100)))
 
 
+def _snap_kelvin(kelvin: float) -> int:
+    """Clamp a Kelvin value to the lamp's range and round it to its step grid.
+
+    Rounds half up (not Python's banker's rounding) so 5250 -> 5300, the
+    nearest value the lamp can actually hold, instead of letting the lamp
+    floor it to 5200 behind our back.
+    """
+    snapped = math.floor(kelvin / KELVIN_STEP + 0.5) * KELVIN_STEP
+    return max(KELVIN_MIN, min(KELVIN_MAX, snapped))
+
+
 def _interpolate_steps(
     start_pct: int | None,
     end_pct: int | None,
@@ -101,7 +119,9 @@ def _interpolate_steps(
     "skip this command"), so a slow 10-minute fade doesn't resend identical
     values every half second. An unknown start (None) sends the end value
     once on the first step and dedupes the rest. The final step always lands
-    exactly on the requested target.
+    exactly on the requested target. Kelvin steps are snapped to the lamp's
+    KELVIN_STEP grid, so a small temperature change over a long fade sends
+    only the few values the lamp can actually show.
     """
     steps: list[tuple[int | None, int | None]] = []
     last_pct = start_pct
@@ -117,7 +137,7 @@ def _interpolate_steps(
         kelvin: int | None = None
         if end_kelvin is not None:
             base = start_kelvin if start_kelvin is not None else end_kelvin
-            value = round(base + (end_kelvin - base) * fraction)
+            value = _snap_kelvin(base + (end_kelvin - base) * fraction)
             if value != last_kelvin:
                 kelvin = last_kelvin = value
         steps.append((pct, kelvin))
@@ -153,7 +173,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
     _attr_color_mode = ColorMode.COLOR_TEMP
     _attr_min_color_temp_kelvin = KELVIN_MIN
     _attr_max_color_temp_kelvin = KELVIN_MAX
-    _attr_supported_features = LightEntityFeature.TRANSITION
+    _attr_supported_features = LightEntityFeature.TRANSITION | LightEntityFeature.FLASH
 
     def __init__(
         self,
@@ -196,7 +216,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         device_info = DeviceInfo(
             identifiers={(DOMAIN, device.id)},
             name=self._base_name,
-            manufacturer="dLight (via custom integration)",
+            manufacturer="dLight",
             model=coordinator.info.get("deviceModel", "dLight"),
             sw_version=coordinator.info.get("swVersion"),
             hw_version=coordinator.info.get("hwVersion"),
@@ -254,10 +274,16 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         With `transition:` the change is emulated by a background fade task
         instead; the service call returns once the fade is scheduled.
         """
+        if (flash := kwargs.get(ATTR_FLASH)) is not None:
+            # A flash is an alert, not a state change: other attributes in the
+            # same call are ignored and the lamp returns to its prior state.
+            await self._async_flash(flash)
+            return
+
         brightness: int | None = kwargs.get(ATTR_BRIGHTNESS)
         kelvin: int | None = kwargs.get(ATTR_COLOR_TEMP_KELVIN)
         if kelvin is not None:
-            kelvin = max(KELVIN_MIN, min(KELVIN_MAX, kelvin))
+            kelvin = _snap_kelvin(kelvin)
         transition: float | None = kwargs.get(ATTR_TRANSITION)
 
         _LOGGER.debug(
@@ -429,6 +455,44 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                     "error": str(err),
                 },
             ) from err
+
+    async def _async_flash(self, flash: str) -> None:
+        """Blink the lamp for `flash: short|long`, then restore its state.
+
+        Runs like the Identify button: the command lock spans the whole
+        sequence (a command landing mid-flash would corrupt the state flash()
+        restores), and identify_in_progress keeps a mid-flash poll from being
+        reported as a physical change.
+        """
+        _LOGGER.debug("%s: flash=%s", self.entity_id, flash)
+        await self._async_cancel_transition()
+        flashes = FLASH_PATTERNS.get(flash, FLASH_PATTERNS[FLASH_SHORT])
+        self.coordinator.identify_in_progress = True
+        try:
+            async with self.coordinator.command_lock:
+                success = await self.device.flash(flashes=flashes)
+        except Exception as err:
+            _LOGGER.exception("Flash failed for dLight %s", self.device.id)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="flash_failed",
+                translation_placeholders={
+                    "device_name": self._base_name,
+                    "error": str(err),
+                },
+            ) from err
+        finally:
+            self.coordinator.identify_in_progress = False
+        if not success:
+            # flash() swallows device errors and reports via its bool result.
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="flash_failed",
+                translation_placeholders={
+                    "device_name": self._base_name,
+                    "error": "flash sequence did not complete",
+                },
+            )
 
     async def _send(self, commands: list) -> None:
         """Run device commands concurrently; raise the first failure, if any.
@@ -609,6 +673,11 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                 self._optimistic_brightness = None
                 self._optimistic_kelvin = None
                 self.async_write_ha_state()
+            # Restart the hold window at the fade's end, not just its start:
+            # a fade longer than the poll interval would otherwise finish
+            # outside the window, and the closing reconcile below would report
+            # the whole fade as an external change (issue #89).
+            self._last_command_time = time.monotonic()
         except asyncio.CancelledError:
             raise  # a newer command took over; it owns the state from here
         except Exception:  # noqa: BLE001 — background task: log, don't crash HA
@@ -699,7 +768,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
 
         within_hold = (
             self._optimistic_on is not None
-            and time.monotonic() - self._last_command_time < POLL_INTERVAL
+            and time.monotonic() - self._last_command_time < self.coordinator.poll_interval
         )
 
         if within_hold:

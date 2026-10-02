@@ -1,8 +1,10 @@
 """Update platform for dLight: surfaces firmware version via UpdateEntity.
 
 The coordinator fetches swVersion once during setup and caches it in
-coordinator.info. The entity surfaces that as `installed_version`; no OTA
-source is currently known so `latest_version` is always None.
+coordinator.info. The entity surfaces that as `installed_version`. No OTA
+source is currently known, so `latest_version` reports the installed version:
+the entity reads "up to date" rather than a permanent "unknown" (HA derives
+an update entity's state from both versions, and None makes it unknown).
 
 The entity overrides `available` to stay True whenever swVersion is cached,
 even when the lamp is temporarily unreachable. Firmware version is static
@@ -36,15 +38,15 @@ async def async_setup_entry(
 class DLightUpdateEntity(CoordinatorEntity[DLightCoordinator], UpdateEntity):
     """Surfaces the lamp's installed firmware version.
 
-    latest_version is None because there is no known OTA source yet; this
-    makes the entity a passive version display rather than an active updater.
+    latest_version mirrors installed_version because there is no known OTA
+    source yet; this makes the entity a passive version display ("up to
+    date") rather than an active updater.
     """
 
     _attr_has_entity_name = True
     _attr_translation_key = "firmware"
     _attr_device_class = UpdateDeviceClass.FIRMWARE
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_latest_version: str | None = None
 
     def __init__(self, coordinator: DLightCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
@@ -72,5 +74,5 @@ class DLightUpdateEntity(CoordinatorEntity[DLightCoordinator], UpdateEntity):
 
     @property
     def latest_version(self) -> str | None:
-        """No OTA source configured; always None."""
-        return None
+        """No OTA source configured; nothing newer is known than what is installed."""
+        return self.installed_version

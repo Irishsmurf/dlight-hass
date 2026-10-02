@@ -15,7 +15,7 @@ _attr_supported_features = LightEntityFeature.TRANSITION
 PARALLEL_UPDATES = 1           # serialize service calls per lamp
 ```
 
-The device-registry card (manufacturer, model, firmware, MAC, configuration URL) is built **once** from `coordinator.info`, which is static.
+The device-registry card (manufacturer, model, firmware, MAC, configuration URL) is built **once** from `coordinator.info`, which is static. If the info wasn't available at setup, the coordinator fills the card in later by updating the device registry entry directly.
 
 ## Brightness scaling
 
@@ -67,6 +67,7 @@ for result in results:
 
 - `return_exceptions=True` lets every command finish before judging the batch — a plain `gather` would abandon in-flight siblings on the first failure.
 - The `command_lock` keeps the batch from interleaving with fade steps or the identify flash.
+- Kelvin is clamped to the lamp's range and snapped to its 100 K grid (`_snap_kelvin`, `KELVIN_STEP`) before anything is sent or predicted. The lamp floors off-grid values on its own (5250 → 5200), so an unsnapped request would never match the next poll and would be reported as an external change.
 - Setting brightness/temperature implicitly powers the lamp on, so an explicit `turn_on()` is only prepended for a bare turn-on or when the lamp is (as far as we know) off.
 - A failure clears the optimistic guess and raises `HomeAssistantError` (translatable) — **not** `ServiceValidationError`: the user's input was valid; the *device* failed.
 
@@ -105,8 +106,8 @@ This is what stops a quick brightness-slider drag from flickering back to an old
 The protocol has no native fade, so `transition:` is emulated by a cancellable background task. See the user-facing behavior in [Transitions](../user-guide/transitions.md). Internals:
 
 - `_async_start_turn_on_fade` / `_async_start_turn_off_fade` decide whether a fade is even possible (known starting point, something actually changes) and return `False` to fall back to the instant path otherwise.
-- `_fade_plan` slices the transition into ≤ `TRANSITION_MAX_STEPS` (60) steps at ~`TRANSITION_STEP_INTERVAL` (0.5 s); `_interpolate_steps` computes per-step deltas, sending only what changed and landing exactly on target at the final step.
-- `_async_run_fade` walks the steps under `command_lock`, updating optimistic state each step so the UI animates. A device error ends the fade with a log entry (there's no service call left to raise into); `CancelledError` is re-raised because a newer command has taken ownership.
+- `_fade_plan` slices the transition into ≤ `TRANSITION_MAX_STEPS` (60) steps at ~`TRANSITION_STEP_INTERVAL` (0.5 s); `_interpolate_steps` computes per-step deltas, sending only what changed (Kelvin snapped to the 100 K grid) and landing exactly on target at the final step.
+- `_async_run_fade` walks the steps under `command_lock`, updating optimistic state each step so the UI animates. A device error ends the fade with a log entry (there's no service call left to raise into); `CancelledError` is re-raised because a newer command has taken ownership. A completed fade restarts the hold window (`_last_command_time`) at its end as well as its start, so a fade longer than the poll interval still finishes inside the window instead of being reported as an external change.
 - `_async_cancel_transition` cancels any in-flight fade and **awaits** it, so a new command never races a half-unwound fade. `async_will_remove_from_hass` cancels too, so an entity never leaves a fade running behind it.
 
 !!! note "Fades drop their task reference before the closing refresh"

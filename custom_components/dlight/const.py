@@ -13,12 +13,24 @@ CONF_POLL_INTERVAL = "poll_interval"
 # How often the coordinator polls each lamp, in seconds.
 POLL_INTERVAL = 30
 
+# How long to wait between retries of the static device-info query when it
+# failed at setup (lamp offline at HA start). Retried only after a successful
+# state poll, so a lamp that never answers get_info costs one extra query per
+# interval, not one per poll.
+INFO_RETRY_INTERVAL = 300
+
 # Hard ceiling for a single poll (state + info queries combined), in seconds.
 POLL_TIMEOUT = 10
 
 # White-spectrum range supported by dLight hardware (per vendor docs).
 KELVIN_MIN = 2600
 KELVIN_MAX = 6000
+
+# The lamp stores colour temperature in 100 K steps and rounds anything else
+# down (5250 -> 5200), so every value sent is snapped to this grid. Otherwise
+# the next poll disagrees with the optimistic state and reads as an external
+# change (issue #88).
+KELVIN_STEP = 100
 
 # Runtime IP self-healing: after this many *consecutive* failed polls the
 # coordinator fires a one-shot UDP discovery sweep, looking for the lamp on a

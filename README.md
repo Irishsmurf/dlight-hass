@@ -15,6 +15,7 @@
   <a href="https://github.com/Irishsmurf/dlight-hass/actions/workflows/hassfest.yaml"><img src="https://github.com/Irishsmurf/dlight-hass/actions/workflows/hassfest.yaml/badge.svg" alt="Hassfest"></a>
   <a href="https://github.com/Irishsmurf/dlight-hass/actions/workflows/hacs.yaml"><img src="https://github.com/Irishsmurf/dlight-hass/actions/workflows/hacs.yaml/badge.svg" alt="HACS Action"></a>
   <a href="https://codecov.io/gh/Irishsmurf/dlight-hass"><img src="https://codecov.io/gh/Irishsmurf/dlight-hass/branch/main/graph/badge.svg" alt="Coverage"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Irishsmurf/dlight-hass" alt="License: MIT"></a>
 </p>
 
 ---
@@ -82,3 +83,7 @@ Releases are automated: bump the version in `manifest.json`, commit, and push a 
 ## ⚠️ Disclaimer
 
 This is an unofficial community project with no official vendor support. Use at your own risk. The dLight name and branding identify this integration and the hardware it controls; the project is not affiliated with or endorsed by the hardware vendor.
+
+## 📄 License
+
+Released under the [MIT License](LICENSE).

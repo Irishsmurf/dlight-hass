@@ -1,9 +1,17 @@
 """Tests for the dLight connectivity binary sensor."""
 from dlightclient import DLightConnectionError
 
+from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
 from homeassistant.helpers import entity_registry as er
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.dlight.const import DOMAIN, POLL_INTERVAL, REDISCOVERY_FAILURE_THRESHOLD
+from custom_components.dlight.const import (
+    CONF_DEVICE_ID,
+    CONF_POLL_INTERVAL,
+    DOMAIN,
+    POLL_INTERVAL,
+    REDISCOVERY_FAILURE_THRESHOLD,
+)
 from .conftest import setup_integration
 
 
@@ -55,6 +63,22 @@ async def test_connectivity_sensor_health_attributes_healthy(
     assert attrs["last_successful_poll"] is not None  # set by setup poll
     assert attrs["rediscovery_in_progress"] is False
     assert attrs["poll_interval_seconds"] == POLL_INTERVAL
+
+
+async def test_connectivity_sensor_reports_configured_poll_interval(hass, mock_dlight_device):
+    """poll_interval_seconds follows the options flow, not the default constant (#90)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_IP_ADDRESS: "127.0.0.1", CONF_DEVICE_ID: "test_device_id", CONF_NAME: "Test Light"},
+        options={CONF_POLL_INTERVAL: 60},
+        title="Test Light",
+        entry_id="test_entry_poll",
+    )
+    await setup_integration(hass, entry)
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "binary_sensor", DOMAIN, "dlight_test_device_id_connectivity"
+    )
+    assert hass.states.get(entity_id).attributes["poll_interval_seconds"] == 60
 
 
 async def test_connectivity_sensor_health_attributes_degraded(

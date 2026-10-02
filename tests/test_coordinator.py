@@ -5,9 +5,16 @@ from unittest.mock import patch
 from dlightclient import DLightConnectionError
 
 from homeassistant.const import CONF_IP_ADDRESS, CONF_NAME
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.dlight.const import CONF_POLL_INTERVAL, DOMAIN, CONF_DEVICE_ID, REDISCOVERY_FAILURE_THRESHOLD
+from custom_components.dlight.const import (
+    CONF_DEVICE_ID,
+    CONF_POLL_INTERVAL,
+    DOMAIN,
+    INFO_RETRY_INTERVAL,
+    REDISCOVERY_FAILURE_THRESHOLD,
+)
 from .conftest import setup_integration
 
 
@@ -228,3 +235,76 @@ async def test_rediscovery_breaks_early_on_first_match(
     assert "test_device_id" in yielded
     assert "another_device" not in yielded
     assert mock_config_entry.data[CONF_IP_ADDRESS] == "10.0.0.99"
+
+
+# ---------------------------------------------------------------------------
+# Late device-info fetch (issue #93)
+# ---------------------------------------------------------------------------
+
+INFO_OK = {
+    "status": "SUCCESS",
+    "swVersion": "1.0.0",
+    "hwVersion": "1.0.0",
+    "deviceModel": "Test Lamp",
+    "macAddress": "AA:BB:CC:DD:EE:FF",
+}
+
+
+def _device_entry(hass):
+    return dr.async_get(hass).async_get_device(identifiers={(DOMAIN, "test_device_id")})
+
+
+def _firmware_state(hass):
+    entity_id = er.async_get(hass).async_get_entity_id("update", DOMAIN, "dlight_test_device_id_firmware")
+    return hass.states.get(entity_id)
+
+
+async def test_device_info_retried_after_failed_setup(hass, mock_dlight_device, mock_config_entry, freezer):
+    """get_info failing at setup is retried after a later poll and fills the device card."""
+    mock_dlight_device.get_info.side_effect = [DLightConnectionError("slow wifi"), INFO_OK]
+    await setup_integration(hass, mock_config_entry)
+    coordinator = mock_config_entry.runtime_data
+
+    device = _device_entry(hass)
+    assert coordinator.info == {}
+    assert device.model == "dLight" and device.sw_version is None
+    assert _firmware_state(hass).state == "unavailable"
+
+    freezer.tick(timedelta(seconds=INFO_RETRY_INTERVAL + 1))
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    device = _device_entry(hass)
+    assert device.model == "Test Lamp"
+    assert device.sw_version == "1.0.0"
+    assert device.hw_version == "1.0.0"
+    assert (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:dd:ee:ff") in device.connections
+    assert _firmware_state(hass).state == "off"
+
+
+async def test_device_info_retry_is_throttled(hass, mock_dlight_device, mock_config_entry, freezer):
+    """A lamp that keeps failing get_info is asked at most once per INFO_RETRY_INTERVAL."""
+    mock_dlight_device.get_info.side_effect = DLightConnectionError("nope")
+    await setup_integration(hass, mock_config_entry)
+    coordinator = mock_config_entry.runtime_data
+    assert mock_dlight_device.get_info.await_count == 1
+
+    for _ in range(5):  # polls inside the interval: no retry
+        freezer.tick(timedelta(seconds=30))
+        await coordinator.async_refresh()
+    assert mock_dlight_device.get_info.await_count == 1
+
+    freezer.tick(timedelta(seconds=INFO_RETRY_INTERVAL))
+    await coordinator.async_refresh()
+    await coordinator.async_refresh()
+    assert mock_dlight_device.get_info.await_count == 2
+    assert coordinator.last_update_success  # a failed info retry never fails the poll
+
+
+async def test_device_info_not_refetched_when_setup_succeeded(hass, mock_dlight_device, mock_config_entry, freezer):
+    """With info cached at setup, polls never query get_info again."""
+    await setup_integration(hass, mock_config_entry)
+    freezer.tick(timedelta(seconds=INFO_RETRY_INTERVAL * 2))
+    await mock_config_entry.runtime_data.async_refresh()
+    assert mock_dlight_device.get_info.await_count == 1
+    assert _device_entry(hass).manufacturer == "dLight"

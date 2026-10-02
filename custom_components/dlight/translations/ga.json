@@ -109,6 +109,9 @@
         "identify_failed": {
             "message": "Theip ar {device_name} a aithint. Thuairiscigh an gléas: {error}"
         },
+        "flash_failed": {
+            "message": "Theip ar {device_name} a splancadh. Thuairiscigh an gléas: {error}"
+        },
         "flash_unknown_device": {
             "message": "Aitheantas gléis anaithnid: {device_id}. Déan cinnte gurb é an sprioc lampa dLight cumraithe."
         }

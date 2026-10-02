@@ -107,7 +107,7 @@ The protocol has no native fade, so `transition:` is emulated by a cancellable b
 
 - `_async_start_turn_on_fade` / `_async_start_turn_off_fade` decide whether a fade is even possible (known starting point, something actually changes) and return `False` to fall back to the instant path otherwise.
 - `_fade_plan` slices the transition into ≤ `TRANSITION_MAX_STEPS` (60) steps at ~`TRANSITION_STEP_INTERVAL` (0.5 s); `_interpolate_steps` computes per-step deltas, sending only what changed (Kelvin snapped to the 100 K grid) and landing exactly on target at the final step.
-- `_async_run_fade` walks the steps under `command_lock`, updating optimistic state each step so the UI animates. A device error ends the fade with a log entry (there's no service call left to raise into); `CancelledError` is re-raised because a newer command has taken ownership.
+- `_async_run_fade` walks the steps under `command_lock`, updating optimistic state each step so the UI animates. A device error ends the fade with a log entry (there's no service call left to raise into); `CancelledError` is re-raised because a newer command has taken ownership. A completed fade restarts the hold window (`_last_command_time`) at its end as well as its start, so a fade longer than the poll interval still finishes inside the window instead of being reported as an external change.
 - `_async_cancel_transition` cancels any in-flight fade and **awaits** it, so a new command never races a half-unwound fade. `async_will_remove_from_hass` cancels too, so an entity never leaves a fade running behind it.
 
 !!! note "Fades drop their task reference before the closing refresh"

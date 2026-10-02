@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Snap `color_temp_kelvin` to the lamp's 100 K grid (round half up, then clamp) in `async_turn_on` and in every emulated-fade step. The lamp floors off-grid values on its own (5250 → 5200), so the next poll never matched the optimistic state: the UI snapped back after the hold window and a spurious `dlight_physical_control` `changed` event fired, which broke circadian/sun-following automations (closes #88).
+- Restart the optimistic hold window when an emulated fade completes, not only when it starts. A fade longer than the poll interval used to end outside the window, so its closing reconcile compared against the pre-fade state and fired a spurious `dlight_physical_control` `changed` event for the whole fade (closes #89).
 
 ## [2.5.0] - 2026-06-15
 

@@ -622,6 +622,11 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
                 self._optimistic_brightness = None
                 self._optimistic_kelvin = None
                 self.async_write_ha_state()
+            # Restart the hold window at the fade's end, not just its start:
+            # a fade longer than the poll interval would otherwise finish
+            # outside the window, and the closing reconcile below would report
+            # the whole fade as an external change (issue #89).
+            self._last_command_time = time.monotonic()
         except asyncio.CancelledError:
             raise  # a newer command took over; it owns the state from here
         except Exception:  # noqa: BLE001 — background task: log, don't crash HA

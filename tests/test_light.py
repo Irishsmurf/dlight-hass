@@ -1114,6 +1114,47 @@ async def test_physical_control_not_fired_during_transition(
     await entity._async_cancel_transition()
 
 
+async def test_fade_longer_than_poll_interval_does_not_fire_physical_control(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """A fade that outlasts the hold window must not be reported as an external change (#89)."""
+    import time as real_time
+
+    _lamp_returns_fresh_state(mock_dlight_device)
+    start = real_time.monotonic()
+    with patch("custom_components.dlight.light.time") as mock_time:
+        # 100x clock: the 1 s fade below looks like ~100 s to the entity,
+        # far longer than the 30 s poll interval.
+        mock_time.monotonic = lambda: 1000 + (real_time.monotonic() - start) * 100
+        await setup_integration(hass, mock_config_entry)
+        coordinator = mock_config_entry.runtime_data
+        events = []
+        hass.bus.async_listen(EVENT_PHYSICAL_CONTROL, lambda e: events.append(e))
+
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "color_temp_kelvin": 3000, "transition": 1},
+            blocking=True,
+        )
+        await hass.async_block_till_done()  # fade runs to completion
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert events == []
+        assert hass.states.get("light.test_light").attributes["color_temp_kelvin"] == 3000
+
+        # A real external change after the fade is still reported, against the
+        # post-fade state rather than the pre-fade one.
+        await asyncio.sleep(0.5)  # ~50 s on the entity's clock: outside the hold window
+        mock_dlight_device._current_state["color"]["temperature"] = 4500
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    assert len(events) == 1
+    assert events[0].data["action"] == "changed"
+    assert events[0].data["previous_state"]["color"]["temperature"] == 3000
+
+
 async def test_failed_fade_does_not_fire_physical_control(
     hass, mock_dlight_device, mock_config_entry
 ):

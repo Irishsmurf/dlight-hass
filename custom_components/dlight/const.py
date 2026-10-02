@@ -20,6 +20,12 @@ POLL_TIMEOUT = 10
 KELVIN_MIN = 2600
 KELVIN_MAX = 6000
 
+# The lamp stores colour temperature in 100 K steps and rounds anything else
+# down (5250 -> 5200), so every value sent is snapped to this grid. Otherwise
+# the next poll disagrees with the optimistic state and reads as an external
+# change (issue #88).
+KELVIN_STEP = 100
+
 # Runtime IP self-healing: after this many *consecutive* failed polls the
 # coordinator fires a one-shot UDP discovery sweep, looking for the lamp on a
 # new address (covers setups where HA's DHCP watcher can't see the lease).

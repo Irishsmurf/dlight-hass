@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import math
 
 import pytest
@@ -6,6 +7,7 @@ from unittest.mock import patch, AsyncMock
 from homeassistant.components.light import DOMAIN as LIGHT_DOMAIN
 
 from custom_components.dlight.const import DOMAIN, EVENT_PHYSICAL_CONTROL
+from .conftest import setup_integration
 
 
 async def test_light_setup(hass, mock_dlight_device, mock_config_entry):
@@ -786,6 +788,91 @@ async def test_fade_kelvin_target_clamped_at_start(hass, mock_dlight_device, moc
 
     state = hass.states.get("light.test_light")
     assert state.attributes.get("color_temp_kelvin") == KELVIN_MAX
+
+
+# ---------------------------------------------------------------------------
+# Kelvin step grid tests (issue #88)
+# ---------------------------------------------------------------------------
+
+
+def _lamp_returns_fresh_state(mock_device):
+    """Make polls return a new dict each time, like the real client.
+
+    The shared fixture hands back the very dict its command mocks mutate, so a
+    snapshot of "the last confirmed state" silently changes along with the
+    lamp and no external change can ever be detected.
+    """
+    mock_device.get_state.side_effect = lambda *a, **k: copy.deepcopy(mock_device._current_state)
+
+
+def _lamp_floors_kelvin(mock_device):
+    """Make the mock behave like real hardware: Kelvin is stored in 100 K steps, floored."""
+    _lamp_returns_fresh_state(mock_device)
+
+    def set_color_temp(k):
+        mock_device._current_state.setdefault("color", {})["temperature"] = k // 100 * 100
+    mock_device.set_color_temperature.side_effect = set_color_temp
+
+
+async def test_turn_on_kelvin_snapped_to_nearest_step(hass, mock_dlight_device, mock_config_entry):
+    """Off-grid Kelvin is rounded to the nearest 100 K (half up) before it is sent."""
+    await setup_integration(hass, mock_config_entry)
+
+    for requested, sent in ((5250, 5300), (5240, 5200), (2649, 2600)):
+        mock_dlight_device.set_color_temperature.reset_mock()
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "color_temp_kelvin": requested},
+            blocking=True,
+        )
+        mock_dlight_device.set_color_temperature.assert_called_once_with(sent)
+        assert hass.states.get("light.test_light").attributes["color_temp_kelvin"] == sent
+
+
+async def test_off_grid_kelvin_does_not_fire_physical_control(
+    hass, mock_dlight_device, mock_config_entry
+):
+    """The lamp's own rounding must not read as an external change after the hold window."""
+    _lamp_floors_kelvin(mock_dlight_device)
+    fake_time = [1000.0]
+    with patch("custom_components.dlight.light.time") as mock_time:
+        mock_time.monotonic = lambda: fake_time[0]
+        await setup_integration(hass, mock_config_entry)
+        coordinator = mock_config_entry.runtime_data
+        events = []
+        hass.bus.async_listen(EVENT_PHYSICAL_CONTROL, lambda e: events.append(e))
+
+        await hass.services.async_call(
+            LIGHT_DOMAIN,
+            "turn_on",
+            {"entity_id": "light.test_light", "color_temp_kelvin": 5250},
+            blocking=True,
+        )
+        await coordinator.async_refresh()  # inside the hold window
+        fake_time[0] += 120
+        await coordinator.async_refresh()  # well outside it
+        await hass.async_block_till_done()
+
+    assert events == []
+    assert hass.states.get("light.test_light").attributes["color_temp_kelvin"] == 5300
+
+
+async def test_fade_kelvin_steps_on_grid(hass, mock_dlight_device, mock_config_entry):
+    """Every Kelvin value a fade sends is on the lamp's 100 K grid, ending on the snapped target."""
+    await setup_integration(hass, mock_config_entry)
+
+    # 4000 K -> 4350 K (snapped to 4400) over 2 s = 4 steps.
+    await hass.services.async_call(
+        LIGHT_DOMAIN,
+        "turn_on",
+        {"entity_id": "light.test_light", "color_temp_kelvin": 4350, "transition": 2},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    kelvin_calls = [c.args[0] for c in mock_dlight_device.set_color_temperature.call_args_list]
+    assert kelvin_calls == [4100, 4200, 4300, 4400]
 
 
 # ---------------------------------------------------------------------------

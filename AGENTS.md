@@ -23,7 +23,7 @@
 | `event.py` | `DLightEventEntity`: subscribes to the `dlight_physical_control` bus event fired by `light.py` and re-fires it as a proper HA `EventEntity` (device class `button`, diagnostic category) so physical button presses are visible in the device UI and usable as standard automation triggers. |
 | `config_flow.py` | UDP discovery → pick list, manual entry, reconfigure step, and a `dhcp` step (manifest matches `registered_devices`) that self-heals a known lamp's IP when DHCP hands it a new one. Discovery uses `discover_devices_stream` for faster first-lamp response. The **options flow** offers three poll-interval presets (15 s / 30 s / 60 s via `SelectSelector`); changing the setting triggers an entry reload so the coordinator picks up the new interval immediately. Known lamps rediscovered on a new IP during a user-initiated scan are also self-healed; manual re-add of a known lamp refreshes its IP too. |
 | `diagnostics.py` | Redacted snapshot (IP and device ID scrubbed) of entry data, options, device info, and last state. |
-| `const.py` | Domain, config keys, Kelvin range (2600–6000K), poll interval/timeout, rediscovery backoff. |
+| `const.py` | Domain, config keys, Kelvin range (2600–6000K) and 100 K step, poll interval/timeout, rediscovery backoff. |
 | `translations/` | `en`, `de`, `fr`, `ja`, `ga` — keep key parity with `strings.json` when adding UI text. |
 
 ## Commands

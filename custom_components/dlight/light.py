@@ -48,7 +48,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, FADE_TO_OFF_TARGET_PCT, KELVIN_MAX, KELVIN_MIN, MIN_BRIGHTNESS_PCT, POLL_INTERVAL
+from .const import DOMAIN, EVENT_PHYSICAL_CONTROL, FADE_TO_OFF_TARGET_PCT, KELVIN_MAX, KELVIN_MIN, KELVIN_STEP, MIN_BRIGHTNESS_PCT, POLL_INTERVAL
 from .coordinator import DLightCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,6 +88,17 @@ def _to_dlight_brightness(brightness: int) -> int:
     return max(0, min(100, math.ceil(brightness / 255 * 100)))
 
 
+def _snap_kelvin(kelvin: float) -> int:
+    """Clamp a Kelvin value to the lamp's range and round it to its step grid.
+
+    Rounds half up (not Python's banker's rounding) so 5250 -> 5300, the
+    nearest value the lamp can actually hold, instead of letting the lamp
+    floor it to 5200 behind our back.
+    """
+    snapped = math.floor(kelvin / KELVIN_STEP + 0.5) * KELVIN_STEP
+    return max(KELVIN_MIN, min(KELVIN_MAX, snapped))
+
+
 def _interpolate_steps(
     start_pct: int | None,
     end_pct: int | None,
@@ -101,7 +112,9 @@ def _interpolate_steps(
     "skip this command"), so a slow 10-minute fade doesn't resend identical
     values every half second. An unknown start (None) sends the end value
     once on the first step and dedupes the rest. The final step always lands
-    exactly on the requested target.
+    exactly on the requested target. Kelvin steps are snapped to the lamp's
+    KELVIN_STEP grid, so a small temperature change over a long fade sends
+    only the few values the lamp can actually show.
     """
     steps: list[tuple[int | None, int | None]] = []
     last_pct = start_pct
@@ -117,7 +130,7 @@ def _interpolate_steps(
         kelvin: int | None = None
         if end_kelvin is not None:
             base = start_kelvin if start_kelvin is not None else end_kelvin
-            value = round(base + (end_kelvin - base) * fraction)
+            value = _snap_kelvin(base + (end_kelvin - base) * fraction)
             if value != last_kelvin:
                 kelvin = last_kelvin = value
         steps.append((pct, kelvin))
@@ -257,7 +270,7 @@ class DLightEntity(CoordinatorEntity[DLightCoordinator], LightEntity):
         brightness: int | None = kwargs.get(ATTR_BRIGHTNESS)
         kelvin: int | None = kwargs.get(ATTR_COLOR_TEMP_KELVIN)
         if kelvin is not None:
-            kelvin = max(KELVIN_MIN, min(KELVIN_MAX, kelvin))
+            kelvin = _snap_kelvin(kelvin)
         transition: float | None = kwargs.get(ATTR_TRANSITION)
 
         _LOGGER.debug(

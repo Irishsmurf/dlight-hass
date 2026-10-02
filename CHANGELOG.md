@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Snap `color_temp_kelvin` to the lamp's 100 K grid (round half up, then clamp) in `async_turn_on` and in every emulated-fade step. The lamp floors off-grid values on its own (5250 → 5200), so the next poll never matched the optimistic state: the UI snapped back after the hold window and a spurious `dlight_physical_control` `changed` event fired, which broke circadian/sun-following automations (closes #88).
+
 ## [2.5.0] - 2026-06-15
 
 ### Added

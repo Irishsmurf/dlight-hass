@@ -12,7 +12,7 @@ The primary entity. It uses Home Assistant's **color-temperature** color mode an
 |---|---|---|
 | **On / off** | — | Standard light toggle. |
 | **Brightness** | 0–100 % (device) ↔ 0–255 (HA) | Scaled with a ceiling so 1 % never rounds to "off". |
-| **Color temperature** | **2600 K – 6000 K** | Warm white to cool white (tunable white). |
+| **Color temperature** | **2600 K – 6000 K**, 100 K steps | Warm white to cool white (tunable white). Requests are rounded to the nearest 100 K, the finest step the lamp can hold. |
 | **Transition** | any duration | *Emulated* — see [Transitions](transitions.md). |
 
 ![dLight tunable-white range: 2600 K warm to 6000 K cool](../assets/color-temperature.svg){ loading=lazy }

@@ -21,7 +21,7 @@ The integration follows Home Assistant's modern **coordinator + entity** pattern
 | `binary_sensor.py` | Connectivity diagnostic sensor mirroring poll health. |
 | `config_flow.py` | Discovery, manual entry, reconfigure, and DHCP self-healing. |
 | `diagnostics.py` | Redacted entry/coordinator snapshot. |
-| `const.py` | Domain, config keys, Kelvin range, poll interval/timeout, rediscovery backoff. |
+| `const.py` | Domain, config keys, Kelvin range and step, poll interval/timeout, rediscovery backoff. |
 | `translations/` | `en`, `de`, `fr`, `ja`, `ga` — kept at parity with `strings.json`. |
 
 ## Lifecycle

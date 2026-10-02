@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-10-02
+
 ### Added
 - Add an MIT `LICENSE` (matching `dlight-client`) and a license badge/section in the README; the HACS Action's license check requires one (`Validation license`).
 - Support the standard `flash: short | long` option of `light.turn_on` (`LightEntityFeature.FLASH`): runs `device.flash()` with 2 or 5 blinks under `command_lock`, with `identify_in_progress` set so a mid-flash poll isn't reported as a physical change; the lamp returns to its previous state. A failure raises the new translated `flash_failed` error (closes #92).

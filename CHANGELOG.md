@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Snap `color_temp_kelvin` to the lamp's 100 K grid (round half up, then clamp) in `async_turn_on` and in every emulated-fade step. The lamp floors off-grid values on its own (5250 → 5200), so the next poll never matched the optimistic state: the UI snapped back after the hold window and a spurious `dlight_physical_control` `changed` event fired, which broke circadian/sun-following automations (closes #88).
 - Restart the optimistic hold window when an emulated fade completes, not only when it starts. A fade longer than the poll interval used to end outside the window, so its closing reconcile compared against the pre-fade state and fired a spurious `dlight_physical_control` `changed` event for the whole fade (closes #89).
 - Use the configured poll interval (`coordinator.poll_interval`) for the light's optimistic hold window and the connectivity sensor's `poll_interval_seconds` attribute; both still used the 30 s `POLL_INTERVAL` default after the options flow (#79) made the interval configurable, so with a 60 s interval a stale poll could snap the UI back (closes #90).
+- Report the installed firmware as `latest_version` on the update entity until an OTA source exists; with `latest_version = None` Home Assistant showed the entity as `unknown` forever instead of *up to date* (closes #91).
 
 ## [2.5.0] - 2026-06-15
 

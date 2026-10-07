@@ -7,6 +7,6 @@
     "documentation": "https://github.com/Irishsmurf/dlight-hass",
     "iot_class": "local_polling",
     "issue_tracker": "https://github.com/Irishsmurf/dlight-hass/issues",
-    "requirements": ["dlight-client==2.0.0"],
+    "requirements": ["dlight-client==2.1.0"],
     "version": "2.6.0"
 }
